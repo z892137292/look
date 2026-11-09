@@ -1,0 +1,655 @@
+#!/usr/bin/python3 -I
+# lk-nodes：Looklook「节点」页的 root 小服务（只听 127.0.0.1:9091），管理本机的 mihomo（lk-mihomo.service）。
+#
+# - mihomo 配置由这里生成（/var/lib/lk-nodes/config.yaml），全局代理：除局域网外都走 GLOBAL-OUT。
+# - 节点来源：手动粘贴的链接（local.yaml）+ 订阅地址（mihomo 自己定时拉取）。
+# - 读（节点列表、延迟、订阅流量）不需要口令；改（加/删节点和订阅、切换、防火墙开关）要请求头
+#   X-Panel-Password，与安装时设置的「节点密码」（/etc/lk-nodes/panel.pass，PBKDF2）比对。
+# - 节点密码、uuid、订阅地址、mihomo 密钥只在 root / lk-mihomo 可读的文件里，页面拿不到。
+# - 防火墙（nftables 表 inet lk_nodes）：
+#     总是：DNS（53 端口）交给 mihomo，防止 DNS 泄漏；别人连进来的连接，回包走原路由（SSH 不断）。
+#     kill-switch 打开时：只有 mihomo 进程能直接出网，其它程序只能走代理或连局域网；没有可用节点就断网。
+#
+# 命令行：lk-nodes-helper [serve|render|fw|fw-off|passwd]
+import hashlib, hmac, ipaddress, json, os, pwd, re, secrets, subprocess, sys, threading, time, urllib.parse, urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+VERSION = "1.0.0"
+LISTEN = ("127.0.0.1", 9091)
+ETC = "/etc/lk-nodes"
+STATE = f"{ETC}/state.json"
+PASS = f"{ETC}/panel.pass"
+HOME = "/var/lib/lk-nodes"
+CFG = f"{HOME}/config.yaml"
+LOCAL = f"{HOME}/local.yaml"
+MIHOMO = "/usr/local/lib/lk-nodes/mihomo"
+USER = "lk-mihomo"
+TUN = "lk-tun"
+CTL = "127.0.0.1:9097"
+DNS_PORT = 1053
+MARK = "0x4c4b"
+OUT, AUTO = "GLOBAL-OUT", "AUTO"
+TEST_URL = "https://www.gstatic.com/generate_204"
+TYPES = {"vless", "vmess", "trojan", "ss", "hysteria2", "tuic", "anytls"}
+RESERVED = {"global-out", "auto", "direct", "reject", "reject-drop", "pass", "compatible", "global"}
+MAX_NODES = 200
+MAX_SUBS = 10
+LAN4 = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16"]
+LAN6 = ["fe80::/10", "fc00::/7"]
+INFO_JUNK = "剩余|到期|过期|官网|流量|重置|套餐|Expire|Traffic|官方|网址|客服"
+LOCK = threading.Lock()
+FAILS = []
+
+
+# ---------------- 状态 ----------------
+def load_state():
+    try:
+        s = json.load(open(STATE, encoding="utf-8"))
+    except Exception:
+        s = {}
+    s.setdefault("secret", secrets.token_hex(16))
+    s.setdefault("kill_switch", False)
+    s.setdefault("subs", [])
+    return s
+
+
+def write_private(path, text, owner=None, mode=0o600):
+    tmp = path + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(text)
+    if owner is not None:
+        os.chown(tmp, owner.pw_uid, owner.pw_gid)
+    os.replace(tmp, path)
+
+
+def save_state(s):
+    write_private(STATE, json.dumps(s, ensure_ascii=False, indent=2))
+
+
+def mihomo_user():
+    return pwd.getpwnam(USER)
+
+
+def load_nodes():
+    try:
+        return json.load(open(LOCAL, encoding="utf-8")).get("proxies", [])
+    except Exception:
+        return []
+
+
+def save_nodes(items):
+    write_private(LOCAL, json.dumps({"proxies": items}, ensure_ascii=False, indent=2), mihomo_user())
+
+
+# ---------------- mihomo 配置 ----------------
+def render(s):
+    """生成 mihomo 配置（JSON 也是合法的 YAML）。"""
+    hc = {"enable": True, "url": TEST_URL, "interval": 300}
+    providers = {"local": {"type": "file", "path": "./local.yaml", "health-check": hc}}
+    for sub in s["subs"]:
+        providers["sub-" + sub["id"]] = {
+            "type": "http",
+            "url": sub["url"],
+            "path": f"./subs/{sub['id']}.yaml",
+            "interval": int(sub.get("interval") or 21600),
+            "proxy": "DIRECT",
+            "exclude-filter": INFO_JUNK,
+            "health-check": hc,
+        }
+    last = "REJECT" if s["kill_switch"] else "DIRECT"
+    cfg = {
+        "mode": "rule",
+        "log-level": "warning",
+        "ipv6": False,
+        "allow-lan": False,
+        "unified-delay": True,
+        "external-controller": CTL,
+        "secret": s["secret"],
+        "profile": {"store-selected": True},
+        "tun": {
+            "enable": True,
+            "stack": "mixed",
+            "device": TUN,
+            "auto-route": True,
+            "auto-detect-interface": True,
+            "dns-hijack": ["any:53", "tcp://any:53"],
+            "route-exclude-address": LAN4 + LAN6,
+        },
+        "dns": {
+            "enable": True,
+            "listen": f"127.0.0.1:{DNS_PORT}",
+            "ipv6": False,
+            "enhanced-mode": "fake-ip",
+            "fake-ip-range": "198.18.0.1/16",
+            "fake-ip-filter": ["*.lan", "*.local", "*.localdomain", "*.home.arpa", "+.ts.net", "localhost.ptlogin2.qq.com"],
+            "respect-rules": True,
+            "default-nameserver": ["223.5.5.5", "119.29.29.29"],
+            "proxy-server-nameserver": ["223.5.5.5", "119.29.29.29"],
+            "nameserver": ["https://1.1.1.1/dns-query", "https://8.8.8.8/dns-query"],
+        },
+        "proxy-providers": providers,
+        "proxy-groups": [
+            {"name": AUTO, "type": "url-test", "use": list(providers), "url": TEST_URL, "interval": 300, "tolerance": 80},
+            # 节点都不可用时：kill-switch 关 → 直连；开 → 断网
+            {"name": OUT, "type": "fallback", "proxies": [AUTO, last], "url": TEST_URL, "interval": 120},
+        ],
+        "rules": [f"IP-CIDR,{c},DIRECT,no-resolve" for c in ["127.0.0.0/8"] + LAN4]
+        + [f"IP-CIDR6,{c},DIRECT,no-resolve" for c in ["::1/128"] + LAN6]
+        + [f"MATCH,{OUT}"],
+    }
+    return json.dumps(cfg, ensure_ascii=False, indent=2)
+
+
+def write_config(s):
+    u = mihomo_user()
+    os.makedirs(f"{HOME}/subs", exist_ok=True)
+    os.chown(f"{HOME}/subs", u.pw_uid, u.pw_gid)
+    if not os.path.exists(LOCAL):
+        save_nodes([])
+    text = render(s)
+    write_private(CFG + ".new", text, u)
+    r = subprocess.run([MIHOMO, "-t", "-d", HOME, "-f", CFG + ".new"], capture_output=True, text=True, timeout=60)
+    if r.returncode != 0:
+        os.unlink(CFG + ".new")
+        raise ValueError("mihomo 配置检查没通过：" + (r.stdout + r.stderr).strip()[-400:])
+    os.replace(CFG + ".new", CFG)
+
+
+def reload_mihomo():
+    c, b = mihomo("PUT", "/configs?force=true", json.dumps({"path": CFG}).encode())
+    if c >= 300:
+        subprocess.run(["systemctl", "restart", "lk-mihomo"], timeout=60)
+
+
+OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+def mihomo(method, path, body=None, timeout=15):
+    req = urllib.request.Request(f"http://{CTL}{path}", method=method, data=body)
+    req.add_header("Authorization", "Bearer " + load_state()["secret"])
+    if body is not None:
+        req.add_header("Content-Type", "application/json")
+    try:
+        with OPENER.open(req, timeout=timeout) as r:
+            return r.status, r.read()
+    except urllib.error.HTTPError as e:
+        return e.code, e.read()
+    except Exception as e:
+        return 502, json.dumps({"message": f"连不上 mihomo：{e}"}, ensure_ascii=False).encode()
+
+
+def mj(method, path, body=None):
+    c, b = mihomo(method, path, body)
+    try:
+        return c, json.loads(b or b"{}")
+    except Exception:
+        return c, {}
+
+
+# ---------------- 防火墙 ----------------
+def fw_rules(kill):
+    lan4, lan6 = ", ".join(LAN4), ", ".join(LAN6)
+    r = f"""table inet lk_nodes {{
+  chain pre {{
+    type filter hook prerouting priority mangle; policy accept;
+    iifname != "{TUN}" ct state new ct mark set {MARK}
+  }}
+  chain route_out {{
+    type route hook output priority mangle; policy accept;
+    ct mark {MARK} meta mark set {MARK}
+  }}
+  chain dns {{
+    type nat hook output priority -100; policy accept;
+    meta skuid "{USER}" return
+    ip daddr 127.0.0.0/8 return
+    udp dport 53 redirect to :{DNS_PORT}
+    tcp dport 53 redirect to :{DNS_PORT}
+  }}
+"""
+    if kill:
+        r += f"""  chain kill {{
+    type filter hook output priority filter; policy accept;
+    oifname "lo" accept
+    oifname "{TUN}" accept
+    meta skuid "{USER}" accept
+    ct mark {MARK} accept
+    ip daddr {{ {lan4} }} accept
+    ip6 daddr {{ {lan6} }} accept
+    udp dport {{ 67, 68, 546, 547 }} accept
+    counter reject
+  }}
+"""
+    return r + "}\n"
+
+
+def fw_apply(kill):
+    exists = subprocess.run(["nft", "list", "table", "inet", "lk_nodes"], capture_output=True).returncode == 0
+    script = ("delete table inet lk_nodes\n" if exists else "") + fw_rules(kill)
+    subprocess.run(["nft", "-f", "-"], input=script.encode(), check=True)
+    for fam in ("-4", "-6"):
+        if f"fwmark {MARK}" not in subprocess.run(["ip", fam, "rule"], capture_output=True, text=True).stdout:
+            subprocess.run(["ip", fam, "rule", "add", "fwmark", MARK, "lookup", "main", "pref", "1000"], capture_output=True)
+
+
+def fw_off():
+    subprocess.run(["nft", "delete", "table", "inet", "lk_nodes"], capture_output=True)
+    for fam in ("-4", "-6"):
+        subprocess.run(["ip", fam, "rule", "del", "fwmark", MARK, "lookup", "main", "pref", "1000"], capture_output=True)
+
+
+# ---------------- 口令 ----------------
+def hash_password(p):
+    salt, n = os.urandom(16), 600000
+    return f"{salt.hex()}${n}${hashlib.pbkdf2_hmac('sha256', p.encode(), salt, n).hex()}"
+
+
+def check_password(given):
+    """PBKDF2 比对；10 分钟内错 5 次就锁 10 分钟。"""
+    now = time.time()
+    with LOCK:
+        FAILS[:] = [t for t in FAILS if now - t < 600]
+        if len(FAILS) >= 5:
+            return "locked"
+    try:
+        salt, iters, want = open(PASS).read().strip().split("$")
+        got = hashlib.pbkdf2_hmac("sha256", (given or "").encode(), bytes.fromhex(salt), int(iters)).hex()
+        ok = hmac.compare_digest(got, want)
+    except Exception:
+        ok = False
+    if not ok:
+        time.sleep(1)
+        with LOCK:
+            FAILS.append(now)
+        return "bad"
+    return "ok"
+
+
+# ---------------- 节点 / 订阅 ----------------
+def validate(p, existing):
+    if not isinstance(p, dict):
+        return "节点格式不对"
+    name = str(p.get("name", "")).strip()
+    if not name or len(name) > 64:
+        return "节点名不能为空，最长 64 字"
+    if name.lower() in RESERVED or any(x.get("name") == name for x in existing):
+        return f"节点名「{name}」已被占用"
+    if p.get("type") not in TYPES:
+        return f"类型 {p.get('type')} 不支持"
+    server = str(p.get("server", "")).strip()
+    try:
+        ip = ipaddress.ip_address(server)
+        if not ip.is_global:
+            return f"{name}：地址不是公网 IP"
+    except ValueError:
+        if not re.fullmatch(r"(?=.{1,253}$)([a-zA-Z0-9-]{1,63}\.)+[a-zA-Z]{2,63}", server):
+            return f"{name}：地址既不是 IP 也不是域名"
+    port = p.get("port")
+    if not isinstance(port, int) or not 0 < port < 65536:
+        return f"{name}：端口不对"
+    if len(existing) >= MAX_NODES:
+        return f"最多 {MAX_NODES} 个节点"
+    return None
+
+
+def sub_public(sub):
+    return {"id": sub["id"], "name": sub["name"], "host": urllib.parse.urlsplit(sub["url"]).hostname or "", "interval": sub.get("interval", 21600)}
+
+
+def check_sub_url(url):
+    u = urllib.parse.urlsplit(url)
+    if u.scheme not in ("http", "https") or not u.hostname:
+        return "订阅地址要以 http:// 或 https:// 开头"
+    if len(url) > 2048:
+        return "订阅地址太长"
+    return None
+
+
+GEO = {}  # 地址 -> (到期时间, {"code","tz"} 或 None)
+
+
+def resolve(host):
+    try:
+        ipaddress.ip_address(host)
+        return host
+    except ValueError:
+        pass
+    c, d = mj("GET", f"/dns/query?name={urllib.parse.quote(host)}&type=A")
+    return next((a["data"] for a in (d.get("Answer") or []) if a.get("type") == 1), None)
+
+
+def geo_of(host):
+    now = time.time()
+    hit = GEO.get(host)
+    if hit and hit[0] > now:
+        return hit[1]
+    info = None
+    try:
+        ip = resolve(host)
+        if ip:
+            with urllib.request.urlopen(f"https://ipwho.is/{urllib.parse.quote(ip)}?fields=success,country_code,timezone", timeout=8) as r:
+                d = json.loads(r.read())
+            if d.get("success"):
+                info = {"code": d.get("country_code"), "tz": (d.get("timezone") or {}).get("id")}
+    except Exception:
+        pass
+    GEO[host] = (now + (86400 if info else 300), info)
+    return info
+
+
+def providers_view(s):
+    """各来源的节点（名字、类型、存活）+ 订阅流量/到期；不含地址、密码、订阅地址。"""
+    c, d = mj("GET", "/providers/proxies")
+    subs = {"sub-" + x["id"]: x for x in s["subs"]}
+    out = []
+    for key in ["local"] + list(subs):
+        p = (d.get("providers") or {}).get(key) or {}
+        nodes = [
+            {"name": x.get("name"), "type": x.get("type"), "alive": x.get("alive"), "delay": ((x.get("history") or [{}])[-1]).get("delay")}
+            for x in p.get("proxies") or []
+        ]
+        item = {"key": key, "nodes": nodes, "updatedAt": p.get("updatedAt")}
+        if key in subs:
+            item.update(sub_public(subs[key]))
+            item["info"] = p.get("subscriptionInfo")
+        out.append(item)
+    return out
+
+
+# ---------------- 出口 / TUN / IPv6 ----------------
+EXIT = {"at": 0, "data": None}
+
+
+def exit_info(force=False):
+    """出口 IP、国家、时区（本机流量都走 mihomo，所以查到的就是节点出口）；缓存 60 秒。"""
+    now = time.time()
+    if not force and EXIT["data"] and now - EXIT["at"] < 60:
+        return EXIT["data"]
+    try:
+        with urllib.request.urlopen("https://ipwho.is/?fields=success,ip,country_code,country,city,timezone,connection", timeout=12) as r:
+            d = json.loads(r.read())
+        if not d.get("success"):
+            raise ValueError("查询失败")
+        data = {"ip": d.get("ip"), "code": d.get("country_code"), "city": d.get("city"),
+                "tz": (d.get("timezone") or {}).get("id"), "isp": (d.get("connection") or {}).get("isp")}
+    except Exception as e:
+        data = {"error": f"查不到出口：{e}"}
+    data["lan"] = lan_probe()
+    EXIT.update(at=now, data=data)
+    return data
+
+
+def sys_ipv6():
+    def rd(p):
+        try:
+            return open(p).read().strip()
+        except OSError:
+            return None
+    addrs = 0
+    try:
+        for line in open("/proc/net/if_inet6"):
+            f = line.split()
+            # 作用域 00 = 全局；跳过 TUN 设备自己的地址
+            if f[3] == "00" and not f[5].startswith(("mihomo", "lk-tun", "Meta", "utun")):
+                addrs += 1
+    except OSError:
+        pass
+    return {"disabled": rd("/proc/sys/net/ipv6/conf/all/disable_ipv6") == "1", "global_addrs": addrs}
+
+
+def lan_probe():
+    """局域网通不通：连一下默认网关的 80 / 443 端口（1.5 秒），能建立连接或被对方拒绝都算通（53 会被 mihomo 截走，不能用）。"""
+    import socket, struct
+    gw = None
+    try:
+        for line in open("/proc/net/route").read().splitlines()[1:]:
+            f = line.split()
+            if f[1] == "00000000" and int(f[3], 16) & 2:
+                gw = socket.inet_ntoa(struct.pack("<L", int(f[2], 16)))
+                break
+    except Exception:
+        pass
+    if not gw:
+        return {"gateway": None, "ok": None}
+    for port in (80, 443):
+        s = socket.socket()
+        s.settimeout(1.5)
+        try:
+            s.connect((gw, port))
+            return {"gateway": gw, "ok": True}
+        except ConnectionRefusedError:
+            return {"gateway": gw, "ok": True}
+        except OSError:
+            pass
+        finally:
+            s.close()
+    return {"gateway": gw, "ok": False}
+
+
+def rules_view():
+    """代理模式：规则里除了局域网直连，其它是不是全都走代理（全局）。"""
+    c, b = mihomo("GET", "/rules")
+    try:
+        rules = json.loads(b).get("rules") or [] if c < 300 else []
+    except Exception:
+        rules = []
+    if not rules:
+        return None
+    last = rules[-1]
+    lan_nets = ("127.", "10.", "172.16.", "192.168.", "100.64.", "169.254.", "::1", "fe80:", "fc00:", "198.18.")
+    # 拦截规则（REJECT，例如挡 STUN）不把流量送去别处，不影响「全局」
+    other = [r for r in rules[:-1] if not (r.get("proxy") == "DIRECT" and str(r.get("payload", "")).startswith(lan_nets))
+             and not str(r.get("proxy", "")).startswith("REJECT")]
+    return {"count": len(rules), "final": last.get("proxy") if last.get("type") == "Match" else None,
+            "global": last.get("type") == "Match" and not other}
+
+
+def net_view(force=False):
+    c, b = mihomo("GET", "/configs")
+    try:
+        cfg = json.loads(b) if c < 300 else {}
+    except Exception:
+        cfg = {}
+    tun = cfg.get("tun") or {}
+    return {
+        "exit": exit_info(force),
+        "tun": {"enable": bool(tun.get("enable")), "device": tun.get("device"), "stack": tun.get("stack")} if cfg else None,
+        "mode": cfg.get("mode"),
+        "rules": rules_view() if cfg else None,
+        "ipv6": {"mihomo": cfg.get("ipv6") if cfg else None, **sys_ipv6()},
+    }
+
+
+# ---------------- HTTP ----------------
+class H(BaseHTTPRequestHandler):
+    server_version = "lk-nodes"
+
+    def log_message(self, fmt, *args):
+        pass
+
+    def send(self, code, data, raw=False):
+        body = data if raw else json.dumps(data, ensure_ascii=False).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def body(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        if n > 1 << 20:
+            raise ValueError("太大")
+        return json.loads(self.rfile.read(n) or b"{}")
+
+    def authed(self):
+        r = check_password(self.headers.get("X-Panel-Password", ""))
+        if r == "ok":
+            return True
+        self.send(403 if r == "bad" else 429, {"message": "节点密码不对" if r == "bad" else "密码错太多次，10 分钟后再试"})
+        return False
+
+    def route(self):
+        u = urllib.parse.urlsplit(self.path)
+        seg = [urllib.parse.unquote(x) for x in u.path.strip("/").split("/")]
+        q = ("?" + u.query) if u.query else ""
+        m = self.command
+
+        if m == "GET" and seg == ["health"]:
+            return self.send(200, {"ok": True})
+        if m == "GET" and seg == ["net"]:
+            return self.send(200, net_view("refresh=1" in q))
+        if m == "GET" and seg == ["info"]:
+            s = load_state()
+            return self.send(200, {"version": VERSION, "kill_switch": s["kill_switch"], "subs": True, "auto": AUTO, "out": OUT})
+        if m == "GET" and seg == ["nodes"]:
+            return self.send(200, {"nodes": [{k: p.get(k) for k in ("name", "type", "server", "port")} for p in load_nodes()]})
+        if m == "GET" and seg == ["providers"]:
+            return self.send(200, {"providers": providers_view(load_state())})
+        if m == "GET" and seg == ["geo"]:
+            return self.send(200, {"geo": {p.get("name"): geo_of(str(p.get("server", ""))) for p in load_nodes() if p.get("server")}})
+        if m == "GET" and seg == ["group"]:
+            c, auto = mj("GET", f"/proxies/{AUTO}")
+            if c >= 300:
+                return self.send(c, auto)
+            c2, out = mj("GET", f"/proxies/{OUT}")
+            auto["out"] = out.get("now")
+            return self.send(200, auto)
+        if m == "GET" and len(seg) == 3 and seg[0] == "proxies" and seg[2] == "delay":
+            c, b = mihomo("GET", f"/proxies/{urllib.parse.quote(seg[1], safe='')}/delay{q}")
+            return self.send(c, b, raw=True)
+        if m == "GET" and seg == ["dns"]:
+            c, b = mihomo("GET", f"/dns/query{q}")
+            return self.send(c, b, raw=True)
+
+        if m == "POST" and seg == ["login"]:
+            return self.authed() and self.send(200, {"ok": True})
+        if not self.authed():
+            return
+
+        if m == "POST" and seg == ["nodes"]:
+            got = self.body()
+            got = got if isinstance(got, list) else [got]
+            with LOCK:
+                items = load_nodes()
+                for p in got:
+                    err = validate(p, items)
+                    if err:
+                        return self.send(400, {"message": err})
+                    p["name"] = p["name"].strip()
+                    p["server"] = str(p["server"]).strip()
+                    items.append(p)
+                save_nodes(items)
+                mihomo("PUT", "/providers/proxies/local")
+            return self.send(200, {"ok": True, "added": len(got)})
+        if m == "DELETE" and len(seg) == 2 and seg[0] == "nodes":
+            with LOCK:
+                items = load_nodes()
+                rest = [p for p in items if p.get("name") != seg[1]]
+                if len(rest) == len(items):
+                    return self.send(404, {"message": "没有这个节点"})
+                save_nodes(rest)
+                mihomo("PUT", "/providers/proxies/local")
+            return self.send(200, {"ok": True})
+        if m == "POST" and seg == ["subs"]:
+            b = self.body()
+            url, name = str(b.get("url", "")).strip(), str(b.get("name", "")).strip()[:32]
+            err = check_sub_url(url)
+            if err:
+                return self.send(400, {"message": err})
+            with LOCK:
+                s = load_state()
+                if len(s["subs"]) >= MAX_SUBS:
+                    return self.send(400, {"message": f"最多 {MAX_SUBS} 个订阅"})
+                if any(x["url"] == url for x in s["subs"]):
+                    return self.send(400, {"message": "这个订阅已经加过了"})
+                sub = {"id": secrets.token_hex(4), "name": name or (urllib.parse.urlsplit(url).hostname or "订阅"), "url": url, "interval": 21600}
+                s["subs"].append(sub)
+                write_config(s)
+                save_state(s)
+                reload_mihomo()
+            return self.send(200, {"ok": True, "sub": sub_public(sub)})
+        if m == "DELETE" and len(seg) == 2 and seg[0] == "subs":
+            with LOCK:
+                s = load_state()
+                rest = [x for x in s["subs"] if x["id"] != seg[1]]
+                if len(rest) == len(s["subs"]):
+                    return self.send(404, {"message": "没有这个订阅"})
+                s["subs"] = rest
+                write_config(s)
+                save_state(s)
+                reload_mihomo()
+                try:
+                    os.unlink(f"{HOME}/subs/{seg[1]}.yaml")
+                except OSError:
+                    pass
+            return self.send(200, {"ok": True})
+        if m == "POST" and len(seg) == 3 and seg[0] == "subs" and seg[2] == "update":
+            c, b = mihomo("PUT", f"/providers/proxies/sub-{urllib.parse.quote(seg[1], safe='')}", timeout=60)
+            if c >= 300:
+                return self.send(502, {"message": "更新失败：订阅地址打不开或内容看不懂"})
+            return self.send(200, {"ok": True})
+        if m == "PUT" and seg == ["select"]:
+            name = str(self.body().get("name", ""))
+            c, b = mihomo("PUT", f"/proxies/{AUTO}", json.dumps({"name": name}).encode())
+            return self.send(c, b or b"{}", raw=True)
+        if m == "DELETE" and seg == ["select"]:
+            c, b = mihomo("DELETE", f"/proxies/{AUTO}")
+            return self.send(c, b or b"{}", raw=True)
+        if m == "PUT" and seg == ["settings"]:
+            b = self.body()
+            with LOCK:
+                s = load_state()
+                if "kill_switch" in b:
+                    s["kill_switch"] = bool(b["kill_switch"])
+                    write_config(s)
+                    save_state(s)
+                    reload_mihomo()
+                    fw_apply(s["kill_switch"])
+            return self.send(200, {"ok": True, "kill_switch": s["kill_switch"]})
+        self.send(404, {"message": "not found"})
+
+    def handle_one(self):
+        try:
+            self.route()
+        except Exception as e:
+            self.send(500, {"message": str(e)})
+
+    do_GET = do_POST = do_PUT = do_DELETE = handle_one
+
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "serve"
+    if os.geteuid() != 0:
+        sys.exit("要用 root 运行")
+    os.makedirs(ETC, mode=0o700, exist_ok=True)
+    if cmd == "render":  # 生成配置（安装、升级时用）
+        s = load_state()
+        save_state(s)
+        write_config(s)
+    elif cmd == "fw":  # 按当前设置装防火墙（lk-mihomo 启动前调用）
+        fw_apply(load_state()["kill_switch"])
+    elif cmd == "fw-off":
+        fw_off()
+    elif cmd == "fw-stop":  # mihomo 停了：kill-switch 关着就把防火墙全撤掉（DNS 恢复）；开着就保持断网
+        if not load_state()["kill_switch"]:
+            fw_off()
+    elif cmd == "kill-switch":  # 命令行开关：lk-nodes-helper kill-switch on|off
+        s = load_state()
+        s["kill_switch"] = sys.argv[2:3] == ["on"]
+        write_config(s)
+        save_state(s)
+        fw_apply(s["kill_switch"])
+        print("kill-switch", "已打开" if s["kill_switch"] else "已关闭", "（重启 lk-mihomo 生效：systemctl restart lk-mihomo）")
+    elif cmd == "passwd":  # 设置节点密码：从标准输入读一行
+        p = sys.stdin.readline().rstrip("\n")
+        if len(p) < 6:
+            sys.exit("节点密码至少 6 位")
+        write_private(PASS, hash_password(p) + "\n")
+    elif cmd == "serve":
+        ThreadingHTTPServer(LISTEN, H).serve_forever()
+    else:
+        sys.exit(__doc__ or "用法：lk-nodes-helper [serve|render|fw|fw-off|kill-switch on|off|passwd]")
+
+
+if __name__ == "__main__":
+    main()

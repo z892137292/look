@@ -1,0 +1,640 @@
+//! 本机网关：同一套路由挂在两个入口上。
+//!
+//! - **直接入口**（默认 `0.0.0.0:1234`）：浏览器直接连到这台机器打开管理台。按来源 IP 放行：
+//!   本机总是可以；局域网、白名单要用户在设置里允许，并可要求访问码；Host 只接受本机、IP 与局域网名字
+//!   （防 DNS 重绑定）。见 `access.rs`。
+//! - **远程入口**（随机端口，rathole 的 `local_addr`）：每个请求必须带平台签名的会话凭证和引用它的
+//!   网关令牌 v3（服务端 docs/04 §4.4，见 `remote.rs`）。`user_host` 进管理台/终端路由，`tunnel` 转到凭证里的本机端口。
+//!
+//! 路由：`/api/*` 本机接口；`/mcp` AI 助手用的 MCP 接口（只限本机，见 `mcp.rs`）；`/i/{id}/…` 终端（反向代理到 ttyd）；`/fonts/*` 终端字体；其余为管理台页面。
+
+pub mod access;
+mod api;
+
+pub use api::create_session;
+mod assets;
+mod chat;
+mod chat_mux;
+mod dsh;
+mod notify;
+pub mod mcp;
+mod proxy;
+pub mod remote;
+mod ts_report;
+mod mihomo;
+
+use std::net::{IpAddr, SocketAddr};
+use std::sync::{Arc, RwLock};
+
+use axum::extract::{ConnectInfo, Request, State};
+use axum::http::{header, HeaderMap, HeaderValue, Method, StatusCode};
+use axum::middleware::{self, Next};
+use axum::response::{IntoResponse, Redirect, Response};
+use axum::routing::{any, get};
+use axum::Router;
+use looklook_protocol::edge_auth;
+use looklook_protocol::gateway_token::{self, Kind};
+
+use crate::account::Account;
+use crate::error::LocalError;
+use crate::instances::Instances;
+use crate::paths::Paths;
+use crate::store::Store;
+
+pub use proxy::{client as proxy_client, HttpClient};
+pub use api::local_only;
+
+/// 请求从哪个入口进来。
+#[derive(Debug, Clone)]
+pub enum Access {
+    Local,
+    Remote { host: String, proto: String },
+    /// 经 WebRTC 通道（服务端 docs/06）：只有已授权的 PeerConnection 才能发请求。`origin` 是稳定地址的源（平台签在授权票据里）。
+    Rtc { origin: String },
+}
+
+impl Access {
+    pub fn is_local(&self) -> bool {
+        matches!(self, Access::Local)
+    }
+}
+
+pub struct Inner {
+    pub account: Arc<Account>,
+    pub instances: Arc<Instances>,
+    pub updater: Arc<crate::updater::Updater>,
+    pub metrics: Arc<crate::metrics::Metrics>,
+    /// 后台线路测速（自动选择、偏慢提示）
+    pub relay_watch: Arc<crate::relay_watch::RelayWatch>,
+    /// 终端文件传输：进行中的分块上传（docs/FILE_TRANSFER.md §4）
+    pub transfers: Arc<crate::transfer::Transfers>,
+    /// Claude Code 对话界面（docs/CLAUDE_UI.md）
+    pub chat: Arc<crate::chat::Chat>,
+    pub store: Arc<Store>,
+    pub paths: Paths,
+    pub ui_addr: SocketAddr,
+    pub relay_addr: SocketAddr,
+    pub http: HttpClient,
+    /// 直接访问控制（局域网、白名单、访问码、打开地址），改设置时同步更新
+    pub access: RwLock<access::AccessConfig>,
+    pub limiter: access::Limiter,
+    /// 白名单里域名（DDNS）的解析结果
+    pub resolved: Arc<access::Resolved>,
+    /// 这台机器的局域网 IP（启动时取一次，只用于显示）
+    pub lan_ips: Vec<IpAddr>,
+    /// 远程入口的凭证缓存与 jti 去重
+    pub remote: remote::Verifier,
+    /// 管理台经 WebRTC 的连接（src/rtc）
+    pub rtc: Arc<crate::rtc::Rtc>,
+    /// 本机 App 连同一账户其他电脑的连接（src/rtc/outbound.rs）
+    pub outbound: Arc<crate::rtc::outbound::Outbound>,
+    /// 从另一台电脑导入 SSH 主机：进行中的导出与导入（src/ssh_transfer.rs）
+    pub ssh_transfer: crate::ssh_transfer::SshTransfer,
+    /// 设置在电脑之间同步（src/settings_sync.rs）
+    pub sync: Arc<crate::settings_sync::Syncer>,
+    /// 飞书通知（src/notify.rs）
+    pub notify: Arc<crate::notify::Notifier>,
+}
+
+impl Inner {
+    pub fn access(&self) -> access::AccessConfig {
+        self.access.read().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+
+    /// 把浏览器打开地址写到 `run/open`（`looklook open`、托盘菜单使用），返回不带结尾 `/` 的地址。
+    pub fn write_open_file(&self) -> std::io::Result<String> {
+        let base = match self.access().open_host() {
+            Some(h) => format!("http://{}:{}", h.url_host(), self.ui_addr.port()),
+            None => format!("http://{}", self.ui_addr),
+        };
+        std::fs::write(self.paths.home.join("run").join("open"), &base)?;
+        Ok(base)
+    }
+
+    /// 管理台的访问情况，界面据此显示端口、局域网地址与安全提醒。
+    pub fn console_info(&self) -> serde_json::Value {
+        let c = self.access();
+        serde_json::json!({
+            "port": self.ui_addr.port(),
+            "lan_ips": self.lan_ips.iter().map(|ip| ip.to_string()).collect::<Vec<_>>(),
+            "allow_lan": c.allow_lan,
+            "allowed_ips": c.allowed_ips.len(),
+            "code_enabled": c.code_enabled,
+        })
+    }
+}
+
+pub type App = Arc<Inner>;
+
+// The platform reserves and strips X-LL-* before proxying browser requests.
+pub const CLIENT_HEADER: &str = "x-looklook-client";
+
+pub fn router(app: App) -> Router {
+    Router::new()
+        .nest("/api", api::routes(app.clone()))
+        .route("/i/{id}", get(|axum::extract::Path(id): axum::extract::Path<String>| async move { Redirect::permanent(&format!("/i/{id}/")) }))
+        .route("/i/{id}/", any(terminal))
+        .route("/i/{id}/{*rest}", any(terminal))
+        // 本地改版：共享浏览器（claude-browser 服务的 Chrome 调试端口），管理台的“浏览器”页面用
+        .route("/cdp/{*rest}", any(cdp))
+        // 本地改版：共享浏览器的远程画面（KasmVNC 网页客户端），管理台“浏览器”页面里嵌入
+        // 本地改版：「节点」页 → 本机 mihomo（备用节点列表 + 测速/切换），见 mihomo.rs
+        .route("/mihomo/{*rest}", any(mihomo::handle))
+        .route("/vnc", get(|| async { Redirect::permanent("/vnc/") }))
+        .route("/vnc/", any(vnc))
+        .route("/vnc/{*rest}", any(vnc))
+        // DSH 的网页界面（会话标签里打开），见 dsh.rs
+        .route(
+            "/w/{id}",
+            get(|axum::extract::Path(id): axum::extract::Path<String>, uri: axum::http::Uri| async move {
+                Redirect::permanent(&format!("/w/{id}/{}", uri.query().map(|q| format!("?{q}")).unwrap_or_default()))
+            }),
+        )
+        .route("/w/{id}/", any(dsh::web))
+        .route("/w/{id}/{*rest}", any(dsh::web))
+        .route(looklook_protocol::rtc::OFFER_PATH, axum::routing::post(crate::rtc::offer))
+        .route(mcp::PATH, axum::routing::post(mcp::handle).get(mcp::not_allowed).delete(mcp::not_allowed))
+        .route(crate::chat::hooks::PATH, axum::routing::post(chat::hook))
+        .route("/fonts/{*path}", get(assets::font))
+        .route("/static/term.js", get(assets::term_js))
+        .route("/static/web.js", get(assets::web_js))
+        .fallback(assets::ui)
+        .layer(middleware::from_fn_with_state(app.clone(), remote_gate))
+        .layer(middleware::from_fn(security_headers))
+        .with_state(app)
+}
+
+/// 本机、局域网打开不需要账户；远程打开（专属地址、WebRTC）要登录且会员有效。
+/// 不能用时只留状态接口，远程页面据此说明原因、引导续费。
+async fn remote_gate(State(app): State<App>, req: Request, next: Next) -> Response {
+    let local = req.extensions().get::<Access>().is_none_or(Access::is_local);
+    if local || req.uri().path() == "/api/status" {
+        return next.run(req).await;
+    }
+    let gate = app.account.gate();
+    if gate.allowed() {
+        return next.run(req).await;
+    }
+    if req.uri().path().starts_with("/api/") {
+        return LocalError::locked(gate.reason()).into_response();
+    }
+    let kind = match gate.reason() {
+        Some("MEMBERSHIP_EXPIRED") => "locked_expired",
+        Some(crate::account::OFFLINE_TOO_LONG) => "locked_offline",
+        _ => "locked",
+    };
+    assets::message_page(StatusCode::FORBIDDEN, kind)
+}
+
+/// 管理台、终端页只允许同源嵌入（本机直连的终端页改用 CSP `frame-ancestors`，见 `terminal`）；地址里的一次性口令不随 Referer 泄露。
+async fn security_headers(req: Request, next: Next) -> Response {
+    let mut r = next.run(req).await;
+    let h = r.headers_mut();
+    if !h.contains_key(header::CONTENT_SECURITY_POLICY) {
+        h.entry("x-frame-options").or_insert(HeaderValue::from_static("SAMEORIGIN"));
+    }
+    h.entry("x-content-type-options").or_insert(HeaderValue::from_static("nosniff"));
+    h.entry("referrer-policy").or_insert(HeaderValue::from_static("no-referrer"));
+    r
+}
+
+/// 直接入口：按来源 IP 放行，检查 Host，需要时检查访问码。
+pub async fn local_guard(State(app): State<App>, mut req: Request, next: Next) -> Response {
+    // 没有连接信息只会出现在测试里，按本机处理。
+    let conn = req.extensions().get::<ConnectInfo<Conn>>().map(|c| c.0);
+    let peer_ip = conn.map(|c| c.remote.ip().to_canonical()).unwrap_or(IpAddr::from([127, 0, 0, 1]));
+    // 连接两端是同一个 IP，或者是启动时指定也当作本机的来源（Docker 里运行时宿主机经网关连进来）
+    let same_host = conn.and_then(|c| c.local).is_some_and(|l| l.ip().to_canonical() == peer_ip) || access::local_from(peer_ip);
+    let cfg = app.access();
+    let mut peer = access::classify(peer_ip, &cfg, same_host, &app.resolved.ips(&cfg));
+    // 白名单域名的 IP 可能刚变（DDNS）：重新解析一次再判断
+    if peer == access::Peer::Denied && app.resolved.refresh_if_stale(&cfg).await {
+        peer = access::classify(peer_ip, &cfg, same_host, &app.resolved.ips(&cfg));
+    }
+    if !host_name(req.headers()).is_some_and(|n| access::host_allowed(n, cfg.open_host().as_ref())) {
+        if peer == access::Peer::Denied {
+            return assets::denied_page(&peer_ip.to_string());
+        }
+        return (StatusCode::FORBIDDEN, "forbidden host").into_response();
+    }
+    if peer == access::Peer::Denied {
+        return assets::denied_page(&peer_ip.to_string());
+    }
+    // 本地改版：路由器推送 Tailscale 状态（自带令牌，不走访问码）
+    if req.uri().path().starts_with(ts_report::PREFIX) {
+        return ts_report::handle(&app.paths, peer_ip, req).await;
+    }
+    if peer.needs_code(&cfg) && !cookie(req.headers(), access::COOKIE).is_some_and(|v| ct_eq(v, &cfg.cookie_value())) {
+        if req.uri().path() == access::FORM_PATH && req.method() == Method::POST {
+            return submit_code(&app, &cfg, peer_ip, req).await;
+        }
+        if req.uri().path().starts_with("/api/") {
+            return LocalError::new("ACCESS_CODE_REQUIRED").into_response();
+        }
+        let next_path = req.uri().path_and_query().map(|p| p.as_str()).unwrap_or("/");
+        return assets::code_page(next_path, None);
+    }
+    req.extensions_mut().insert(Access::Local);
+    req.extensions_mut().insert(peer);
+    req.extensions_mut().insert(access::PeerIp(peer_ip));
+    next.run(req).await
+}
+
+/// 访问码表单：对了就发 Cookie 并回到原来的页面。
+async fn submit_code(app: &App, cfg: &access::AccessConfig, ip: IpAddr, req: Request) -> Response {
+    if app.limiter.blocked(ip) {
+        return assets::code_page("/", Some("too_many"));
+    }
+    use axum::extract::FromRequest;
+    let form = axum::Form::<std::collections::HashMap<String, String>>::from_request(req, &()).await.map(|f| f.0).unwrap_or_default();
+    let field = |k: &str| form.get(k).map(String::as_str).unwrap_or("");
+    // 只回到本站的相对路径
+    let next = Some(field("next")).filter(|n| n.starts_with('/') && !n.starts_with("//") && !n.starts_with("/\\")).unwrap_or("/");
+    if !cfg.code_matches(field("code")) {
+        app.limiter.fail(ip);
+        tracing::warn!(%ip, "访问码错误");
+        return assets::code_page(next, Some(if app.limiter.blocked(ip) { "too_many" } else { "wrong" }));
+    }
+    app.limiter.clear(ip);
+    let mut r = Redirect::to(next).into_response();
+    let c = format!("{}={}; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000", access::COOKIE, cfg.cookie_value());
+    r.headers_mut().insert(header::SET_COOKIE, HeaderValue::from_str(&c).expect("cookie"));
+    r
+}
+
+/// 远程入口：验证会话凭证与网关令牌；隧道请求直接转发。
+async fn relay_entry(app: App, inner: Router, mut req: Request) -> Response {
+    let header = |h: &HeaderMap, name: &str| h.get(name).and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
+    let (cap, token) = (header(req.headers(), edge_auth::CAP_HEADER), header(req.headers(), gateway_token::HEADER));
+    let remote = match app.remote.verify(&app.account, &cap, &token) {
+        Ok(r) => r,
+        Err(why) => {
+            tracing::debug!(why, "远程请求未通过校验");
+            return (StatusCode::UNAUTHORIZED, "unauthorized").into_response();
+        }
+    };
+    req.headers_mut().remove(gateway_token::HEADER);
+    req.headers_mut().remove(edge_auth::CAP_HEADER);
+    let proto = req
+        .headers()
+        .get("x-forwarded-proto")
+        .and_then(|v| v.to_str().ok())
+        .filter(|p| *p == "http" || *p == "https")
+        .unwrap_or("https")
+        .to_string();
+    match remote.kind {
+        Kind::Tunnel => proxy::tunnel(&app, req, &remote, &proto).await,
+        Kind::UserHost => {
+            req.extensions_mut().insert(remote.clone());
+            req.extensions_mut().insert(Access::Remote { host: remote.host, proto });
+            use tower::ServiceExt;
+            inner.oneshot(req).await.into_response()
+        }
+    }
+}
+
+/// 本地改版：`/cdp/…` → 本机 127.0.0.1:9222（共享浏览器的 Chrome 调试接口）。
+/// 只给直接入口（本机、过了访问码的局域网）；能控制浏览器就能用它登录过的网站，所以 WebSocket 要同源、
+/// 普通请求要带管理台的请求头，别的网站没法跨站调用。
+async fn cdp(State(app): State<App>, mut req: Request) -> Response {
+    const PORT: u16 = 9222;
+    let access = req.extensions().get::<Access>().cloned().unwrap_or(Access::Local);
+    if !access.is_local() {
+        return LocalError::new("REMOTE_FORBIDDEN").into_response();
+    }
+    if proxy::is_websocket(req.headers()) {
+        if !origin_matches(req.headers(), &access) {
+            return (StatusCode::FORBIDDEN, "origin").into_response();
+        }
+    } else if req.headers().get(CLIENT_HEADER).and_then(|v| v.to_str().ok()) != Some("1") {
+        return LocalError::new("CSRF_FAILED").into_response();
+    }
+    let pq = req.uri().path_and_query().map(|p| p.as_str()).unwrap_or("/cdp/");
+    let Ok(uri) = pq.strip_prefix("/cdp").unwrap_or("/").parse() else {
+        return StatusCode::BAD_REQUEST.into_response();
+    };
+    *req.uri_mut() = uri;
+    // Chrome 只接受 Host 是 localhost 或 IP 的请求；Origin 不转（服务启动时已 --remote-allow-origins）
+    req.headers_mut().remove(header::ORIGIN);
+    req.headers_mut().remove(header::COOKIE);
+    let opts = proxy::Opts { auth: None, host: Some(format!("127.0.0.1:{PORT}")), inject: None, rewrite_location: None, terminal: false };
+    proxy::forward(&app.http, req, PORT, opts).await
+}
+
+/// 本地改版：`/vnc/…` → 本机 KasmVNC（127.0.0.1:6901，claude-vnc 服务）。权限同 `/cdp`：只给直接入口，
+/// WebSocket 要同源；KasmVNC 自己的 Basic 口令在 ~/.local/share/looklook/vnc.auth，由这里代填。
+async fn vnc(State(app): State<App>, mut req: Request) -> Response {
+    const PORT: u16 = 6901;
+    let access = req.extensions().get::<Access>().cloned().unwrap_or(Access::Local);
+    if !access.is_local() {
+        return LocalError::new("REMOTE_FORBIDDEN").into_response();
+    }
+    if proxy::is_websocket(req.headers()) && !origin_matches(req.headers(), &access) {
+        return (StatusCode::FORBIDDEN, "origin").into_response();
+    }
+    let pq = req.uri().path_and_query().map(|p| p.as_str()).unwrap_or("/vnc/");
+    let Ok(uri) = pq.strip_prefix("/vnc").filter(|r| !r.is_empty()).unwrap_or("/").parse() else {
+        return StatusCode::BAD_REQUEST.into_response();
+    };
+    *req.uri_mut() = uri;
+    // KasmVNC 的 WebSocket 必须带 Origin，统一改成它自己的地址
+    req.headers_mut().insert(header::ORIGIN, header::HeaderValue::from_static("http://127.0.0.1:6901"));
+    req.headers_mut().remove(header::COOKIE);
+    let auth = std::fs::read_to_string(app.paths.home.join("vnc.auth")).ok().map(|s| format!("Basic {}", s.trim()));
+    let opts = proxy::Opts { auth, host: Some(format!("127.0.0.1:{PORT}")), inject: None, rewrite_location: None, terminal: false };
+    proxy::forward(&app.http, req, PORT, opts).await
+}
+
+/// 终端：`/i/{id}/…` → 对应 ttyd。
+async fn terminal(State(app): State<App>, req: Request) -> Response {
+    let access = req.extensions().get::<Access>().cloned().unwrap_or(Access::Local);
+    let id = req.uri().path().trim_start_matches("/i/").split('/').next().unwrap_or("").to_string();
+    let Some((port, auth)) = app.instances.upstream(&id) else {
+        return assets::message_page(StatusCode::SERVICE_UNAVAILABLE, "not_running");
+    };
+    if proxy::is_websocket(req.headers()) && !origin_matches(req.headers(), &access) {
+        return (StatusCode::FORBIDDEN, "origin").into_response();
+    }
+    // 对话模式的 Codex：终端里是接到同一个 app-server、同一个会话的 TUI。连上之前起好 app-server、备好会话，
+    // 连上之后终端停在 shell 上就替用户打开 TUI（见 chat::codex_chat）
+    let codex = proxy::is_websocket(req.headers()) && app.store.instance(&id).ok().flatten().is_some_and(|r| app.instances.codex_app_mode(&r));
+    if codex {
+        app.chat.codex_prepare_terminal(&id).await;
+    }
+    // Windows：ttyd 只接入会话，连上之前先确保会话在（见 Instances::command_for）
+    if proxy::is_websocket(req.headers()) {
+        app.instances.ensure_attachable(&id).await;
+    }
+    if codex {
+        tokio::spawn(app.chat.clone().codex_terminal_attached(id.clone()));
+    }
+    let index = req.method() == Method::GET && req.uri().path() == format!("/i/{id}/");
+    if let Some(page) = index.then(assets::term_page).flatten() {
+        return page;
+    }
+    let opts = proxy::Opts { auth: Some(auth), host: None, inject: index.then_some(proxy::TERM_TAGS), rewrite_location: None, terminal: true };
+    proxy::forward(&app.http, req, port, opts).await
+}
+
+/// 写请求与 WebSocket 的来源检查：`Origin` 必须是当前站点本身。
+pub fn origin_matches(h: &HeaderMap, access: &Access) -> bool {
+    let Some(origin) = h.get(header::ORIGIN).and_then(|v| v.to_str().ok()) else {
+        // 非浏览器请求没有 Origin；本机入口已有访问口令，远程入口已有网关令牌。
+        return true;
+    };
+    match access {
+        Access::Local => {
+            let host = h.get(header::HOST).and_then(|v| v.to_str().ok()).unwrap_or("");
+            origin.eq_ignore_ascii_case(&format!("http://{host}"))
+        }
+        // 平台转发的主机名不带端口（开发环境的非标准端口会出现在 Origin 里），只比较协议与主机名。
+        Access::Remote { host, proto } => origin
+            .split_once("://")
+            .is_some_and(|(scheme, rest)| scheme.eq_ignore_ascii_case(proto) && strip_port(rest).eq_ignore_ascii_case(strip_port(host))),
+        // 通道上的请求由 Service Worker 转来，浏览器不会带 Origin；带了就必须是稳定地址本身。
+        Access::Rtc { origin: own, .. } => origin.eq_ignore_ascii_case(own),
+    }
+}
+
+fn strip_port(hostport: &str) -> &str {
+    match hostport.rsplit_once(':') {
+        Some((h, p)) if !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()) => h,
+        _ => hostport,
+    }
+}
+
+/// 请求头 Host 里的主机名（去掉端口与 IPv6 方括号）。
+fn host_name(h: &HeaderMap) -> Option<&str> {
+    let host = h.get(header::HOST).and_then(|v| v.to_str().ok())?;
+    Some(if let Some(rest) = host.strip_prefix('[') {
+        rest.split(']').next().unwrap_or("")
+    } else {
+        host.rsplit_once(':').map(|(n, _)| n).unwrap_or(host)
+    })
+}
+
+
+
+pub fn cookie<'a>(h: &'a HeaderMap, name: &str) -> Option<&'a str> {
+    h.get_all(header::COOKIE)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|v| v.split(';'))
+        .find_map(|kv| kv.trim().strip_prefix(name).and_then(|r| r.strip_prefix('=')))
+}
+
+pub(crate) fn ct_eq(a: &str, b: &str) -> bool {
+    a.len() == b.len() && a.bytes().zip(b.bytes()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
+
+/// 连接两端的地址：判断“从这台机器自己连过来”（两端同一个 IP）要用到本端地址。
+#[derive(Debug, Clone, Copy)]
+pub struct Conn {
+    pub remote: SocketAddr,
+    pub local: Option<SocketAddr>,
+}
+
+impl axum::extract::connect_info::Connected<axum::serve::IncomingStream<'_, tokio::net::TcpListener>> for Conn {
+    fn connect_info(s: axum::serve::IncomingStream<'_, tokio::net::TcpListener>) -> Self {
+        // 每个新连接调用一次，顺便关掉 Nagle：终端按键与回显都是小包，不能攒着等确认
+        // （macOS / Windows 的回环上能多等几十到两百毫秒）。
+        let _ = s.io().set_nodelay(true);
+        Conn { remote: *s.remote_addr(), local: s.io().local_addr().ok() }
+    }
+}
+
+pub async fn serve(listener: tokio::net::TcpListener, app: axum::Router, shutdown: tokio_util::sync::CancellationToken) {
+    // 带上连接的来源地址，直接入口按来源 IP 放行。
+    let r = axum::serve(listener, app.into_make_service_with_connect_info::<Conn>()).with_graceful_shutdown(async move { shutdown.cancelled().await }).await;
+    if let Err(e) = r {
+        tracing::error!(error = %e, "网关退出");
+    }
+}
+
+pub fn local_app(app: App) -> Router {
+    router(app.clone())
+        .layer(middleware::from_fn_with_state(app.clone(), to_peer))
+        .layer(middleware::from_fn_with_state(app, local_guard))
+}
+
+/// 本机管理台发给另一台电脑的请求（服务端 docs/06 §14）：带 `X-LL-Device`（不是本机），或者是那台电脑上的终端
+/// （`/i/{id}…`、`/api/instances/{id}…`，按终端路由表与地址上的 `__lldev`），经 WebRTC 转给它（`rtc::outbound`）。
+/// 只转发这台电脑自己（`Peer::Local`）打开的管理台的请求；写请求与 WebSocket 先在这里做和本机接口一样的来源检查，
+/// 那台电脑那边不再看来源。
+async fn to_peer(State(app): State<App>, req: Request, next: Next) -> Response {
+    use crate::rtc::outbound;
+    if req.extensions().get::<access::Peer>() != Some(&access::Peer::Local) {
+        return next.run(req).await;
+    }
+    let Some(session) = app.account.session() else { return next.run(req).await };
+    // 只看本机：一律在本机处理（页面也不会再指定别的电脑）
+    if api::local_only(&app) {
+        return next.run(req).await;
+    }
+    let own = session.device_id;
+    let pq = req.uri().path_and_query().map(|p| p.as_str()).unwrap_or("/").to_string();
+    let (path, hint) = outbound::take_device_hint(&pq);
+    let terminal = outbound::terminal_of(req.uri().path()).map(str::to_owned);
+    if let (Some(t), Some(d)) = (&terminal, &hint) {
+        app.outbound.remember(t, d);
+    }
+    let header_dev = req.headers().get(looklook_protocol::DEVICE_HEADER).and_then(|v| v.to_str().ok()).map(str::to_owned);
+    let target = header_dev.or(hint).or_else(|| terminal.as_deref().and_then(|t| app.outbound.owner(t)));
+    let Some(dev) = target.filter(|d| *d != own) else { return next.run(req).await };
+    let ws = req.headers().get(header::UPGRADE).and_then(|v| v.to_str().ok()).is_some_and(|v| v.eq_ignore_ascii_case("websocket"));
+    if ws || !matches!(*req.method(), Method::GET | Method::HEAD) {
+        let marked = ws || req.headers().get(CLIENT_HEADER).and_then(|v| v.to_str().ok()) == Some("1");
+        if !marked || !origin_matches(req.headers(), &Access::Local) {
+            return LocalError::new("CSRF_FAILED").into_response();
+        }
+    }
+    let link = match app.outbound.link(&app.account, &dev).await {
+        Ok(l) => l,
+        Err(e) => return e.response(),
+    };
+    if ws {
+        outbound::websocket(link, req, path).await
+    } else {
+        outbound::http(link, req, path).await
+    }
+}
+
+pub fn relay_app(app: App) -> Router {
+    let inner = router(app.clone());
+    let revoke = {
+        let app = app.clone();
+        move |headers: HeaderMap, body: axum::body::Bytes| crate::rtc::revoke(State(app), headers, body)
+    };
+    Router::new()
+        .route(looklook_protocol::PRESENCE_PATH, get(presence))
+        .route(looklook_protocol::rtc::REVOKE_PATH, axum::routing::post(revoke))
+        .fallback(move |req: Request| {
+            let (app, inner) = (app.clone(), inner.clone());
+            async move { relay_entry(app, inner, req).await }
+        })
+}
+
+/// 设备在线（中转经通道请求，见 `looklook_protocol::PRESENCE_PATH`）：连上就立即回一个心跳，之后定时回，
+/// 中转收到第一个心跳就把这台电脑标为在线，连接断了、心跳停了就马上标为离线。
+/// 只有中转本机能连到这个端口，内容也只是心跳，不需要令牌。
+/// 新中转会定期重新请求，并在请求头里说明周期：记下来给通道看门狗（`relay::presence_seen`）。
+async fn presence(headers: HeaderMap) -> Response {
+    use futures_util::StreamExt;
+    let cycle = headers.get(looklook_protocol::PRESENCE_CYCLE_HEADER).and_then(|v| v.to_str().ok()).and_then(|v| v.trim().parse().ok());
+    crate::relay::presence_seen(cycle);
+    let beats = futures_util::stream::unfold(true, |first| async move {
+        if !first {
+            tokio::time::sleep(std::time::Duration::from_secs(looklook_protocol::PRESENCE_BEAT_SECS)).await;
+        }
+        Some((Ok::<_, std::convert::Infallible>(axum::body::Bytes::from_static(b"1\n")), false))
+    })
+    .boxed();
+    (
+        [
+            (axum::http::header::CONTENT_TYPE, "text/plain"),
+            (axum::http::header::CACHE_CONTROL, "no-store"),
+            (axum::http::HeaderName::from_static(looklook_protocol::PRESENCE_HEADER), "1"),
+        ],
+        axum::body::Body::from_stream(beats),
+    )
+        .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn h(pairs: &[(&str, &str)]) -> HeaderMap {
+        let mut m = HeaderMap::new();
+        for (k, v) in pairs {
+            m.append(axum::http::HeaderName::from_bytes(k.as_bytes()).unwrap(), HeaderValue::from_str(v).unwrap());
+        }
+        m
+    }
+
+    /// 本机、局域网不看账户；远程打开要登录且会员有效，不能用时只留状态接口。
+    #[tokio::test]
+    async fn remote_needs_account_local_does_not() {
+        use tower::ServiceExt;
+        let home = tempfile::tempdir().unwrap();
+        let key = ed25519_dalek::SigningKey::from_bytes(&[7u8; 32]);
+        let a = crate::ssh_transfer::e2e::app(home.path(), "http://127.0.0.1:9", "deva", key);
+        let call = |access: Access, path: &str| {
+            let mut req = Request::builder().uri(path).body(axum::body::Body::empty()).unwrap();
+            req.extensions_mut().insert(access);
+            let r = router(a.clone());
+            async move {
+                let r = r.oneshot(req).await.unwrap();
+                let status = r.status();
+                let body = axum::body::to_bytes(r.into_body(), 1 << 20).await.unwrap();
+                (status, serde_json::from_slice::<serde_json::Value>(&body).unwrap_or_default(), String::from_utf8_lossy(&body).into_owned())
+            }
+        };
+        let remote = || Access::Remote { host: "alice.looklook.test".into(), proto: "https".into() };
+        let rtc = || Access::Rtc { origin: "https://alice.looklook.test".into() };
+
+        let (st, _, _) = call(remote(), "/api/settings").await;
+        assert_eq!(st, StatusCode::OK, "会员有效时远程照常");
+
+        let mut s = a.account.session().unwrap();
+        s.expires_ms = 1;
+        a.account.set_for_test(s, &[]);
+        let (_, v, _) = call(Access::Local, "/api/status").await;
+        assert_eq!((v["account"]["allowed"].as_bool(), v["account"]["remote_allowed"].as_bool()), (Some(true), Some(false)));
+        let (st, _, _) = call(Access::Local, "/api/settings").await;
+        assert_eq!(st, StatusCode::OK, "会员到期不影响本机");
+        let (st, v, _) = call(remote(), "/api/status").await;
+        assert_eq!((st, v["account"]["allowed"].as_bool(), v["account"]["reason"].as_str()), (StatusCode::OK, Some(false), Some("MEMBERSHIP_EXPIRED")));
+        for access in [remote(), rtc()] {
+            let (st, v, _) = call(access, "/api/settings").await;
+            assert_eq!((st, v["error"]["code"].as_str(), v["error"]["params"]["reason"].as_str()), (StatusCode::FORBIDDEN, Some("LOCKED"), Some("MEMBERSHIP_EXPIRED")));
+        }
+        let (st, _, html) = call(remote(), "/i/abcdefgh/").await;
+        assert_eq!(st, StatusCode::FORBIDDEN);
+        assert!(html.contains("会员已到期"), "{html}");
+
+        a.account.clear_for_test();
+        let (_, v, _) = call(Access::Local, "/api/status").await;
+        assert_eq!((v["account"]["logged_in"].as_bool(), v["account"]["allowed"].as_bool()), (Some(false), Some(true)));
+        for path in ["/api/settings", "/api/instances", "/api/notify"] {
+            let (st, v, _) = call(Access::Local, path).await;
+            assert_eq!(st, StatusCode::OK, "没登录也能在本机用：{path} {v}");
+        }
+        let (_, v, _) = call(Access::Local, "/api/tunnels").await;
+        assert_eq!(v["error"]["code"].as_str(), Some("NOT_LOGGED_IN"), "本机网页是远程功能");
+        let (st, v, _) = call(remote(), "/api/instances").await;
+        assert_eq!((st, v["error"]["code"].as_str()), (StatusCode::UNAUTHORIZED, Some("NOT_LOGGED_IN")));
+    }
+
+    #[test]
+    fn host_names() {
+        assert_eq!(host_name(&h(&[("host", "127.0.0.1:1234")])), Some("127.0.0.1"));
+        assert_eq!(host_name(&h(&[("host", "[::1]:1234")])), Some("::1"));
+        assert_eq!(host_name(&h(&[("host", "nas.local")])), Some("nas.local"));
+        assert_eq!(host_name(&h(&[])), None);
+    }
+
+    #[test]
+    fn origins() {
+        let local = Access::Local;
+        assert!(origin_matches(&h(&[("host", "127.0.0.1:1234"), ("origin", "http://127.0.0.1:1234")]), &local));
+        assert!(!origin_matches(&h(&[("host", "127.0.0.1:1234"), ("origin", "https://evil.example")]), &local));
+        assert!(origin_matches(&h(&[("host", "127.0.0.1:1234")]), &local));
+        let remote = Access::Remote { host: "alice.looklook.example".into(), proto: "https".into() };
+        assert!(origin_matches(&h(&[("origin", "https://alice.looklook.example")]), &remote));
+        assert!(!origin_matches(&h(&[("origin", "https://alice--k7m2q9xa.looklook.example")]), &remote));
+        assert!(!origin_matches(&h(&[("origin", "http://alice.looklook.example")]), &remote));
+        assert!(!origin_matches(&h(&[("origin", "https://alice.looklook.example.evil.example")]), &remote));
+        let dev = Access::Remote { host: "carol.4.looklook.example".into(), proto: "http".into() };
+        assert!(origin_matches(&h(&[("origin", "http://carol.4.looklook.example:31235")]), &dev));
+    }
+
+    #[test]
+    fn cookies() {
+        let m = h(&[("cookie", "a=1; ll_local=xyz; b=2")]);
+        assert_eq!(cookie(&m, "ll_local"), Some("xyz"));
+        assert_eq!(cookie(&m, "ll_loc"), None);
+        assert!(ct_eq("abc", "abc"));
+        assert!(!ct_eq("abc", "abd"));
+    }
+}

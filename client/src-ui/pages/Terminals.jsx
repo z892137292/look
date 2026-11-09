@@ -1,0 +1,1323 @@
+// 会话（终端）的公共部件：操作（打开、停止、复制……）、新建 / 编辑对话框、文件夹与 shell 选择、运行记录、远程访问卡片。
+// 会话页本身见 Sessions.jsx。每个会话是一个可以长期运行的工作区（例如让 Claude Code 在里面干活），关掉网页也不会停。
+import {
+  ArrowUp,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  CopyPlus,
+  ExternalLink,
+  FileText,
+  Folder,
+  FolderOpen,
+  FolderPlus,
+  GitFork,
+  Globe,
+  HardDrive,
+  Home,
+  Monitor,
+  MonitorSmartphone,
+  Pencil,
+  QrCode as QrCodeIcon,
+  RotateCcw,
+  Square,
+  Trash2,
+  Wifi,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+
+import { useStatus } from "../App.jsx";
+import { api, deviceApi, rememberTerminals, selectedDevice, terminalDevice } from "../shared/api.js";
+import { deviceName, osLabel, useDevices } from "../shared/devices.jsx";
+import { urlHost } from "../shared/host.js";
+import { LaunchIcon } from "../shared/brands.jsx";
+import { errorText } from "../shared/i18n.js";
+import { Link } from "../shared/router.jsx";
+import { relativeTime } from "../shared/time.js";
+import { ClaudeProfilePick, CodexProfilePick } from "./ClaudeProfiles.jsx";
+import RelayStatus from "../shared/RelayStatus.jsx";
+import { sessionTitle } from "../shared/sessions.jsx";
+import {
+  Button,
+  Card,
+  CopyButton,
+  ErrorNote,
+  Field,
+  FoldNote,
+  Modal,
+  Note,
+  QrCode,
+  Skeleton,
+  Switch,
+  useAction,
+  useConfirm,
+  useLoad,
+  useToast,
+} from "../shared/ui.jsx";
+import { CHAT_LAUNCHES } from "../shared/chat.js";
+import { RemoteUpsell, remoteAllowed } from "../shared/Remote.jsx";
+
+const LAUNCHES = ["shell", "codex", "claude", "opencode", "dsh", "custom"];
+// 能一键安装的 AI 工具（没装时提示安装）；能以全部权限启动的
+const AI_TOOLS = ["codex", "claude", "opencode", "dsh"];
+const FULL_ACCESS = ["codex", "claude", "opencode"];
+
+export function RemoteCard({ initialOpen = false }) {
+  const { t } = useTranslation();
+  const { status } = useStatus();
+  const [qr, setQr] = useState(initialOpen);
+  const [open, setOpen] = useState(initialOpen);
+  const [mode, setMode] = useState(() => {
+    try {
+      return localStorage.getItem("remote_mode") === "lan" ? "lan" : "public";
+    } catch {
+      return "public";
+    }
+  });
+  const [lanIdx, setLanIdx] = useState(0);
+  const pick = (m) => {
+    setMode(m);
+    try {
+      localStorage.setItem("remote_mode", m);
+    } catch {
+      /* 无痕模式等：只是不记住选择 */
+    }
+  };
+  const c = status.console ?? {};
+  const ips = c.lan_ips ?? [];
+  const lan = mode === "lan";
+  const lanUrl = ips.length
+    ? `http://${urlHost(ips[Math.min(lanIdx, ips.length - 1)])}:${c.port}/`
+    : null;
+  // 局域网：没开放或没找到地址时没有可扫的地址，卡片改为说明怎么开启
+  // 没登录时“随处可用”这一栏讲远程访问、引导开通；局域网不用登录
+  const upsell = !lan && !status.account.logged_in;
+  const lanReady = !lan || (c.allow_lan && lanUrl);
+  const url = lan ? lanUrl : status.account.session?.user_host_url;
+  const host = url?.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const body = lan
+    ? !c.allow_lan
+      ? "terminals.lan_off"
+      : !lanUrl
+        ? "terminals.lan_unknown"
+        : c.code_enabled
+          ? "terminals.lan_body_code"
+          : "terminals.lan_body"
+    : remoteAllowed(status)
+      ? "terminals.remote_body"
+      : "terminals.remote_paused";
+  return (
+    <Card className={`remote-card ${open ? "" : "remote-collapsed"}`}>
+      <button
+        type="button"
+        className="remote-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <MonitorSmartphone size={16} aria-hidden="true" />
+        <b>{t("terminals.remote_title")}</b>
+        {/* 收起时也露出专属地址：很多人不知道自己有这个地址 */}
+        {!open && !lan && host && <span className="remote-host ellipsis">{host}</span>}
+        <span className="grow" />
+        <ChevronDown className="remote-chev" size={16} aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="remote-main">
+          <div
+            className="seg"
+            role="group"
+            aria-label={t("terminals.route_label")}
+          >
+            <button
+              type="button"
+              aria-pressed={!lan}
+              onClick={() => pick("public")}
+            >
+              <Globe size={15} aria-hidden="true" />{" "}
+              {t("terminals.route_public")}
+            </button>
+            <button
+              type="button"
+              aria-pressed={lan}
+              onClick={() => pick("lan")}
+            >
+              <Wifi size={15} aria-hidden="true" /> {t("terminals.route_lan")}
+            </button>
+          </div>
+          {upsell && <RemoteUpsell compact />}
+          {!upsell && <p className="muted small remote-body">{t(body)}</p>}
+          {!lan && !upsell && <RelayStatus />}
+          {lan && ips.length > 1 && lanReady && (
+            <select
+              className="remote-ips"
+              value={lanIdx}
+              onChange={(e) => setLanIdx(Number(e.target.value))}
+              aria-label={t("terminals.lan_pick")}
+            >
+              {ips.map((ip, i) => (
+                <option key={ip} value={i}>
+                  {ip}
+                </option>
+              ))}
+            </select>
+          )}
+          {upsell ? null : lanReady ? (
+            <div className="remote-address">
+              <span className="address-pill">
+                <span>{host}</span>
+                <CopyButton text={url} label={false} variant="plain" />
+              </span>
+              <a
+                className="btn btn-plain remote-open"
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <ExternalLink size={16} aria-hidden="true" />
+                {t("terminals.remote_open")}
+              </a>
+              <button
+                type="button"
+                className="btn btn-plain remote-qr-toggle"
+                aria-expanded={qr}
+                onClick={() => setQr(!qr)}
+              >
+                <QrCodeIcon size={16} aria-hidden="true" />
+                {t(
+                  qr ? "terminals.remote_qr_hide" : "terminals.remote_qr_show",
+                )}
+              </button>
+            </div>
+          ) : (
+            <div className="remote-address">
+              <Link to="/settings#access" className="btn btn-plain remote-open">
+                {t("terminals.lan_go_settings")}
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+      {open && lanReady && !upsell && (
+        <div className={`remote-qr ${qr ? "show" : ""}`}>
+          <QrCode
+            text={url}
+            label={t(
+              lan
+                ? "terminals.remote_qr_label_lan"
+                : "terminals.remote_qr_label",
+            )}
+          />
+        </div>
+      )}
+    </Card>
+  );
+}
+
+export function BackendNote() {
+  const { t } = useTranslation();
+  const { status } = useStatus();
+  const c = status.capabilities;
+  if (!c.ttyd) return <Note kind="error">{t("terminals.no_ttyd")}</Note>;
+  if (c.persistent) return null;
+  return (
+    <FoldNote kind="warn" summary={t("terminals.not_persistent.short")}>
+      {t(
+        `terminals.not_persistent.${c.os === "darwin" ? "darwin" : c.os === "windows" ? "windows" : "linux"}`,
+      )}
+    </FoldNote>
+  );
+}
+
+function stateOf(i) {
+  if (i.running) return i.task_alive === false ? "ready" : "running";
+  return i.task_alive ? "paused" : "stopped";
+}
+
+// 手机/平板打开整页终端 /t/{id}（带按键条）；电脑上新标签页直接打开 /i/{id}/。
+// 新窗口打开管理台的终端页（带文件面板、粘贴、拖放），不再直接打开裸 /i/{id}/。
+const tabUrl = (inst) => `/t/${inst.id}`;
+
+/** DSH 网页界面的地址 /w/{id}/（见 src/gateway/dsh.rs）。多台电脑时带上它所在的电脑（__lldev，启动页 / 本机客户端按它转给那台电脑，之后的请求按会话 id 转）。 */
+export function webSrc(id) {
+  const device = terminalDevice(id) ?? selectedDevice();
+  return device ? `/w/${id}/?__lldev=${encodeURIComponent(device)}` : `/w/${id}/`;
+}
+
+// 在浏览器中单独打开 DSH（平时在会话标签里打开，见 WebPane.jsx）。
+// 桌面应用里交给看看用系统浏览器直接打开 DSH 自己的本机地址（带口令；应用窗口里登录不上 DSH）；
+// 浏览器里打开网关的 /w/{id}/（本机、局域网、远程都能用，远程经管理台的通道）：先在点击里同步开一个空白窗口
+// （不会被当作弹窗拦截），后台确保 DSH 能登录上再跳过去。
+export async function openDsh(inst, t, toast) {
+  const dev = deviceApi(terminalDevice(inst.id));
+  if (window.__LOOKLOOK_DESKTOP__) {
+    try {
+      const r = await dev.post(`/instances/${inst.id}/page?open=1`);
+      if (!r.opened) toast(t("dsh.not_opened"), "error");
+    } catch (e) {
+      toast(errorText(t, e), "error");
+    }
+    return;
+  }
+  const w = window.open("about:blank", "_blank");
+  try {
+    const r = await dev.post(`/instances/${inst.id}/page`);
+    // 没登录上时打开了也只是 DSH 的“需要认证”页
+    if (!r.ready) {
+      w?.close();
+      toast(t("dsh.not_opened"), "error");
+    } else if (w) w.location.href = webSrc(inst.id);
+    else window.open(webSrc(inst.id), "_blank", "noopener");
+  } catch (e) {
+    w?.close();
+    toast(errorText(t, e), "error");
+  }
+}
+
+/**
+ * 一个终端的各种操作（卡片、列表行、工作台侧栏共用）：打开、新窗口、停止、重启、删除……
+ * onOpenHere(id)：在本页打开（电脑上进工作台，手机上整页打开）。
+ * onHide(id, on)：删除时先从列表里拿掉（不给时等删完再刷新）。
+ */
+export function useInstanceActions(inst, { onChanged, onEdit, onLogs, onOpenHere, onHide }) {
+  const { t } = useTranslation();
+  const { status } = useStatus();
+  const confirm = useConfirm();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const state = stateOf(inst);
+  // 终端服务或后台任务还在就算“在运行”，这时不能删除，要先停止。
+  const live = inst.running || Boolean(inst.task_alive);
+  const persistent = status.capabilities.persistent;
+  const allowed = status.account.allowed;
+  const dsh = inst.launch === "dsh";
+  const act = async (fn, okText) => {
+    setBusy(true);
+    try {
+      await fn();
+      if (okText) toast(okText);
+    } catch (e) {
+      toast(errorText(t, e), "error");
+    } finally {
+      setBusy(false);
+      onChanged();
+    }
+  };
+  // 需要时先启动；成功返回 true。
+  const ensureRunning = async () => {
+    if (inst.running) return true;
+    setBusy(true);
+    try {
+      await api.post(`/instances/${inst.id}/start`);
+      return true;
+    } catch (e) {
+      toast(errorText(t, e), "error");
+      return false;
+    } finally {
+      setBusy(false);
+      onChanged();
+    }
+  };
+  // 在本页打开（不改变标签页地址）。
+  const openHere = async () => {
+    if (await ensureRunning()) onOpenHere(inst.id);
+  };
+  const openPage = async () => {
+    setBusy(true);
+    await openDsh(inst, t, toast);
+    setBusy(false);
+    onChanged();
+  };
+  // 新标签页打开：未运行时先同步开一个空白窗口（避免被拦截），启动后再导航过去。
+  const openTab = async () => {
+    if (inst.running) {
+      window.open(tabUrl(inst), "_blank", "noopener");
+      return;
+    }
+    const w = window.open("about:blank", "_blank");
+    if (await ensureRunning()) {
+      if (w) w.location.href = tabUrl(inst);
+    } else {
+      w?.close();
+    }
+  };
+  const stop = async () => {
+    const ok = await confirm({
+      title: t("instance.stop_title", { name: inst.name }),
+      body: t(persistent ? "instance.stop_body" : "instance.stop_body_direct"),
+      confirm: t("instance.stop_confirm"),
+      danger: true,
+    });
+    if (ok) act(() => api.post(`/instances/${inst.id}/stop`), t("instance.stopped"));
+  };
+  const restart = async () => {
+    const ok = await confirm({
+      title: t("instance.restart_title", { name: inst.name }),
+      body: t("instance.restart_body"),
+      confirm: t("instance.restart_confirm"),
+      danger: true,
+    });
+    if (ok) act(() => api.post(`/instances/${inst.id}/restart`), t("instance.restarted"));
+  };
+  const remove = async () => {
+    const ok = await confirm({
+      title: t("instance.delete_title", { name: inst.name }),
+      body: t(live ? "instance.delete_body_running" : "instance.delete_body"),
+      confirm: t("action.delete"),
+      danger: true,
+    });
+    if (!ok) return;
+    // 停掉程序、清理要几秒：先从列表里拿掉，不用看着它转圈；失败再放回来
+    if (!onHide) {
+      act(() => api.del(`/instances/${inst.id}`), t("instance.deleted"));
+      return;
+    }
+    onHide(inst.id, true);
+    try {
+      await api.del(`/instances/${inst.id}`);
+      toast(t("instance.deleted"));
+    } catch (e) {
+      onHide(inst.id, false);
+      toast(errorText(t, e), "error");
+    } finally {
+      onChanged();
+    }
+  };
+  // 复制会话：同一台电脑上照原样（启动方式、文件夹、shell、权限）新建一个并启动，然后在本页打开。
+  // 默认是空白的新会话（同一个项目再开一个干别的）；聊过的 Claude Code / Codex 会话另有“复制一份接着聊”
+  // （fork，换个方向试，原来的不动）。不复制开机自动运行，免得重启后一下子多跑一份；DSH 一台电脑只有一个，不能复制。
+  const conv = ["claude", "codex"].includes(inst.launch) && inst.chat?.turn && inst.chat?.session_id;
+  const duplicate = async (fork = false) => {
+    const dev = terminalDevice(inst.id);
+    const client = deviceApi(dev);
+    setBusy(true);
+    try {
+      const r = await client.post("/instances", {
+        name: t("instance.duplicate_name", { name: (fork && sessionTitle(inst)) || inst.name }).slice(0, 40),
+        workdir: inst.workdir,
+        launch: inst.launch,
+        command: inst.launch === "custom" ? inst.command : "",
+        shell: inst.shell ?? "",
+        auto_start: false,
+        full_access: inst.full_access,
+        root_confirmed: inst.root_confirmed,
+        chat_ui: inst.chat_ui,
+        ...(fork && conv ? { resume: { id: inst.chat.session_id, fork: true } } : {}),
+        start: true,
+      });
+      if (dev && r.id) rememberTerminals(dev, [r]);
+      // 先刷新列表再打开：不然新会话还没在列表里，标签会先显示“会话不在了”
+      await onChanged();
+      onOpenHere(r.id);
+      toast(t(fork && conv ? "instance.duplicated_conv" : "instance.duplicated", { name: r.name }), "ok");
+    } catch (e) {
+      toast(errorText(t, e), "error");
+    } finally {
+      setBusy(false);
+      onChanged();
+    }
+  };
+  // “更多”菜单。full：列表行和侧栏没有单独的按钮，把打开方式、停止也放进来
+  const menu = (full) => [
+    full && dsh && { icon: ExternalLink, label: t("dsh.open_browser"), onClick: openPage, disabled: busy || !allowed },
+    full && !dsh && { icon: ExternalLink, label: t("instance.new_window"), onClick: openTab, disabled: busy || !allowed },
+    { icon: Pencil, label: t("instance.edit"), onClick: () => onEdit(inst) },
+    !dsh && { icon: CopyPlus, label: t("instance.duplicate"), onClick: () => duplicate(false), disabled: busy || !allowed },
+    !dsh && conv && { icon: GitFork, label: t("instance.duplicate_conv"), onClick: () => duplicate(true), disabled: busy || !allowed },
+    inst.running && { icon: RotateCcw, label: t("instance.restart"), onClick: restart },
+    full && live && { icon: Square, label: t("instance.stop"), onClick: stop, disabled: busy },
+    { icon: FileText, label: t("instance.logs"), onClick: () => onLogs(inst) },
+    {
+      icon: Trash2,
+      label: t("action.delete"),
+      onClick: remove,
+      danger: true,
+    },
+  ];
+  // 点名称 / 整行：在本页打开（DSH 在会话标签里显示它的网页，见 WebPane.jsx）
+  const primary = openHere;
+  return { busy, state, live, dsh, allowed, openHere, openPage, openTab, stop, duplicate, menu, primary };
+}
+
+const sepOf = (p) =>
+  /^[A-Za-z]:[\\/]/.test(p) || p.includes("\\") ? "\\" : "/";
+const joinPath = (dir, name) =>
+  dir.endsWith("/") || dir.endsWith("\\")
+    ? dir + name
+    : dir + sepOf(dir) + name;
+
+/** 面包屑：把路径拆成可点击的各级目录。 */
+function crumbsOf(path) {
+  const win = sepOf(path) === "\\";
+  const out = win ? [] : [{ label: "/", path: "/" }];
+  let acc = "";
+  path
+    .split(/[\\/]/)
+    .filter(Boolean)
+    .forEach((name, i) => {
+      acc = win && i === 0 ? `${name}\\` : joinPath(acc, name);
+      out.push({ label: name, path: acc });
+    });
+  return out;
+}
+
+/** 没有权限读取文件夹：按本机系统说明怎么授权（macOS 隐私保护 / Windows 安全设置 / Unix 文件权限）。 */
+function DeniedNote({ data, onRetry }) {
+  const { t } = useTranslation();
+  const os = ["macos", "windows"].includes(data.os) ? data.os : "unix";
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <Note kind="warn">
+        <strong>{t("fs.denied_title", { path: data.path })}</strong>
+        <div className="small" style={{ marginTop: 4 }}>
+          {t(`fs.denied_${os}`)}
+        </div>
+        {data.app_path && (
+          <div className="small" style={{ marginTop: 4 }}>
+            {t("fs.denied_app_path")}{" "}
+            <code className="mono">{data.app_path}</code>
+          </div>
+        )}
+        <div className="row" style={{ gap: 8, marginTop: 6 }}>
+          <Button variant="secondary" icon={RotateCcw} onClick={onRetry}>
+            {t("fs.retry")}
+          </Button>
+        </div>
+      </Note>
+    </div>
+  );
+}
+
+/**
+ * 文件夹选择弹窗：点文件夹进入，“选择此文件夹”确定当前位置。Windows 上最顶层是“此电脑”（各个盘符）。
+ * files：改成选文件（如 SSH 私钥）：文件也列出来，点一下选中、双击直接确定；initial 是文件路径时从它所在的文件夹开始。
+ * title / pickLabel：替换默认的标题和确定按钮文字。
+ */
+export function FolderPicker({ open, initial, onClose, onPick, client = api, files = false, title, pickLabel }) {
+  const { t } = useTranslation();
+  const [cur, setCur] = useState("");
+  const [typed, setTyped] = useState("");
+  const [drives, setDrives] = useState(false);
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState(null);
+  const [hidden, setHidden] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sel, setSel] = useState("");
+  const seq = useRef(0);
+  const load = async (path) => {
+    const n = ++seq.current;
+    setLoading(true);
+    try {
+      const r = await client.get(
+        `/fs/list?path=${encodeURIComponent(path)}&hidden=${hidden ? 1 : 0}${files ? "&files=1" : ""}`,
+      );
+      if (n !== seq.current) return;
+      setData(r);
+      setErr(null);
+    } catch (e) {
+      if (n === seq.current) setErr(e);
+    } finally {
+      if (n === seq.current) setLoading(false);
+    }
+  };
+  useEffect(() => {
+    if (!open) return;
+    // 选文件时从文件所在的文件夹开始，并预先选中它
+    const start = files && initial ? initial.replace(/[\\/][^\\/]*$/, "") || initial : initial ?? "";
+    setCur(start);
+    setTyped(start);
+    setSel(files ? initial ?? "" : "");
+    setHidden(files);
+    setDrives(false);
+    setNewName("");
+    setData(null);
+    setErr(null);
+  }, [open]);
+  useEffect(() => {
+    if (open && !drives) load(cur);
+  }, [open, cur, hidden, drives]);
+  const win = data?.os === "windows";
+  const go = (path) => {
+    setDrives(false);
+    if (files) setSel("");
+    setCur(path);
+    setTyped(path);
+  };
+  const showDrives = () => {
+    setDrives(true);
+    setTyped("");
+  };
+  // 不存在的路径：显示的是最近的已有上级，“选择”仍然选用户要的那个（启动时自动创建）。
+  const target = files ? sel || null : drives ? null : data && !data.exists ? cur : data?.path;
+  const up = () => {
+    if (drives) return;
+    if (data?.parent) go(data.parent);
+    else if (win) showDrives();
+  };
+  const addFolder = () => {
+    const name = newName.trim();
+    if (!name || !data || /[\\/:*?"<>|]/.test(name)) return;
+    go(joinPath(data.path, name));
+    setNewName("");
+  };
+  const entries = drives
+    ? (data?.roots ?? []).map((r) => ({ name: r, path: r, drive: true }))
+    : (data?.entries ?? []).map((e) => ({ ...e, path: joinPath(data.path, e.name) }));
+  const pick = (path) => {
+    // 选文件时主目录下的写成 ~/…，和手填的一样短
+    const home = data?.home;
+    onPick(files && home && path.startsWith(home + sepOf(path)) ? `~${path.slice(home.length)}` : path);
+    onClose();
+  };
+  return (
+    <Modal open={open} onClose={onClose} title={title ?? t("fs.title")} wide className="picker">
+      <div className="picker-bar">
+        <Button
+          variant="ghost"
+          icon={ArrowUp}
+          disabled={drives || !data || (!data.parent && !win)}
+          onClick={up}
+          aria-label={t("fs.up")}
+          title={t("fs.up")}
+        />
+        <Button
+          variant="ghost"
+          icon={Home}
+          disabled={!data?.home}
+          onClick={() => go(data.home)}
+          aria-label={t("fs.home")}
+          title={t("fs.home")}
+        />
+        <form
+          className="grow"
+          onSubmit={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typed.trim()) go(typed.trim());
+          }}
+        >
+          <input
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            className="mono picker-path"
+            spellCheck={false}
+            autoComplete="off"
+            placeholder={drives ? t("fs.computer") : ""}
+            aria-label={t("fs.path")}
+            enterKeyHint="go"
+          />
+        </form>
+      </div>
+      <nav className="picker-crumbs" aria-label={t("fs.path")}>
+        {win && (
+          <button
+            type="button"
+            className={`btn btn-plain ${drives ? "current" : ""}`}
+            onClick={showDrives}
+          >
+            <Monitor size={15} aria-hidden="true" />
+            {t("fs.computer")}
+          </button>
+        )}
+        {!drives &&
+          data &&
+          crumbsOf(data.path).map((c, i, a) => (
+            <button
+              key={c.path}
+              type="button"
+              className={`btn btn-plain mono ${i === a.length - 1 ? "current" : ""}`}
+              onClick={() => go(c.path)}
+            >
+              {c.label}
+            </button>
+          ))}
+      </nav>
+      {err ? (
+        <ErrorNote error={err} />
+      ) : !data ? (
+        <Skeleton height={240} />
+      ) : (
+        <>
+          {!drives &&
+            (data.denied ? (
+              <DeniedNote data={data} onRetry={() => load(cur)} />
+            ) : (
+              !data.exists && !files && (
+                <Note>
+                  <span className="mono">{cur}</span> · {t("fs.will_create")}
+                </Note>
+              )
+            ))}
+          <ul className={`picker-list ${loading ? "loading" : ""}`}>
+            {entries.length === 0 && !data.denied && (
+              <li className="muted small picker-empty">{t(files ? "fs.empty_files" : "fs.empty")}</li>
+            )}
+            {entries.map((e) => {
+              const file = files && !e.drive && !e.is_dir;
+              const Icon = e.drive ? HardDrive : file ? FileText : Folder;
+              return (
+                <li key={e.path}>
+                  {file ? (
+                    <button
+                      type="button"
+                      aria-pressed={sel === e.path}
+                      onClick={() => setSel(e.path)}
+                      onDoubleClick={() => pick(e.path)}
+                    >
+                      <Icon size={18} aria-hidden="true" />
+                      <span className="mono ellipsis grow">{e.name}</span>
+                    </button>
+                  ) : (
+                    <button type="button" onClick={() => go(e.path)}>
+                      <Icon size={18} aria-hidden="true" />
+                      <span className="mono ellipsis grow">
+                        {e.drive ? e.name.replace(/\\$/, "") : e.name}
+                      </span>
+                      <ChevronRight size={16} className="muted" aria-hidden="true" />
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          {!drives && !data.denied && !files && (
+            <div className="row" style={{ gap: 8, marginTop: 10 }}>
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addFolder();
+                  }
+                }}
+                className="mono grow"
+                placeholder={t("fs.new_placeholder")}
+                aria-label={t("fs.new_placeholder")}
+                spellCheck={false}
+              />
+              <Button
+                variant="secondary"
+                icon={FolderPlus}
+                disabled={!newName.trim()}
+                onClick={addFolder}
+              >
+                {t("fs.new")}
+              </Button>
+            </div>
+          )}
+          <label className="small picker-hidden">
+            <input
+              type="checkbox"
+              checked={hidden}
+              onChange={(e) => setHidden(e.target.checked)}
+            />
+            {t(files ? "fs.show_hidden_files" : "fs.show_hidden")}
+          </label>
+        </>
+      )}
+      <div className="picker-selected small">
+        <span className="muted">{t("fs.selected")}</span>{" "}
+        <span className="mono">{target ?? "—"}</span>
+      </div>
+      <div className="modal-actions">
+        <Button variant="ghost" onClick={onClose}>
+          {t("action.cancel")}
+        </Button>
+        <Button
+          icon={Check}
+          disabled={!target}
+          onClick={() => pick(target)}
+        >
+          {pickLabel ?? t("fs.pick")}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+/** 工作目录：可直接输入，也可以在文件夹选择弹窗里点选、新建；目录不存在时启动会自动创建。 */
+export function FolderField({ value, onChange, label, hint, client }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="field">
+      <span className="field-label">{label ?? t("form.workdir")}</span>
+      <div className="row" style={{ gap: 8 }}>
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="mono grow"
+          spellCheck={false}
+          autoComplete="off"
+          aria-label={label ?? t("form.workdir")}
+        />
+        <Button
+          variant="secondary"
+          icon={FolderOpen}
+          aria-haspopup="dialog"
+          onClick={() => setOpen(true)}
+        >
+          {t("fs.browse")}
+        </Button>
+      </div>
+      <span className="field-hint">{hint ?? t("form.workdir_autocreate")}</span>
+      <FolderPicker
+        open={open}
+        initial={value}
+        onClose={() => setOpen(false)}
+        onPick={onChange}
+        client={client}
+      />
+    </div>
+  );
+}
+
+const shellLabel = (data, value) =>
+  data?.items.find((o) => o.value === value)?.label ?? value;
+
+/**
+ * 选择 shell：本机找到的 shell 一行排开，第一项“自动”（新建终端时跟随设置里的默认，设置里则是系统自动选择），
+ * 最后“自定义”可以输入任意命令（如 bash、fish、C:\Program Files\Git\bin\bash.exe -l）。
+ * value 为空表示自动/默认。inherit：设置里的默认 shell（只在新建终端时传入）。
+ */
+// 不填名字时电脑上取的名字（src/instances.rs 的 default_name；重名时那边再加序号）：`my-app · Claude Code`，普通终端就是文件夹名。
+const TOOL_NAMES = { codex: "Codex", claude: "Claude Code", opencode: "OpenCode" };
+function guessName(launch, workdir) {
+  if (launch === "dsh") return "DSH";
+  const dir = (workdir || "").trim().replace(/[\\/]+$/, "").split(/[\\/]/).pop()?.trim();
+  if (!dir || dir === "~" || dir.endsWith(":")) return "";
+  return TOOL_NAMES[launch] ? `${dir} · ${TOOL_NAMES[launch]}` : dir;
+}
+
+export function ShellPicker({ value, onChange, data, inherit }) {
+  const { t } = useTranslation();
+  const known = data?.items.some((o) => o.value === value);
+  const [custom, setCustom] = useState(false);
+  useEffect(() => {
+    if (data && value && !known) setCustom(true);
+  }, [data]);
+  const customOn = custom || (value && data && !known);
+  const autoName = inherit
+    ? shellLabel(data, inherit)
+    : (data?.auto?.label ?? "");
+  const placeholder =
+    data?.os === "windows"
+      ? "bash   ·   C:\\Program Files\\Git\\bin\\bash.exe"
+      : "fish   ·   /usr/local/bin/zsh -l";
+  return (
+    <div className="field">
+      <span className="field-label">{t("shell.label")}</span>
+      {!data ? (
+        <Skeleton height={36} />
+      ) : (
+        <div className="chips" role="group" aria-label={t("shell.label")}>
+          <button
+            type="button"
+            className="chip"
+            aria-pressed={!value && !customOn}
+            onClick={() => {
+              setCustom(false);
+              onChange("");
+            }}
+          >
+            {t(inherit ? "shell.default" : "shell.auto")}
+            {autoName && <span className="chip-sub">{autoName}</span>}
+          </button>
+          {data.items.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              className="chip"
+              aria-pressed={value === o.value && !customOn}
+              title={o.path}
+              onClick={() => {
+                setCustom(false);
+                onChange(o.value);
+              }}
+            >
+              {o.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="chip"
+            aria-pressed={Boolean(customOn)}
+            onClick={() => {
+              setCustom(true);
+              if (known) onChange("");
+            }}
+          >
+            <Pencil size={14} aria-hidden="true" />
+            {t("shell.custom")}
+          </button>
+        </div>
+      )}
+      {customOn && (
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="mono"
+          style={{ marginTop: 8 }}
+          spellCheck={false}
+          autoComplete="off"
+          autoFocus
+          placeholder={placeholder}
+          aria-label={t("shell.custom_label")}
+        />
+      )}
+      <span className="field-hint">
+        {t(customOn ? "shell.custom_hint" : "shell.hint")}
+      </span>
+    </div>
+  );
+}
+
+/** 新建 / 编辑终端。 */
+/** 后台安装的进度：最后几十行输出，自动滚到底；结束后给出结果。 */
+export function InstallProgress({ job, tool, onRetry, busy }) {
+  const { t } = useTranslation();
+  const ref = useRef(null);
+  const lines = job.output.split("\n");
+  const tail = lines.slice(-200).join("\n");
+  useEffect(() => {
+    const el = ref.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [tail]);
+  const kind = job.state === "failed" ? "error" : job.state === "ok" ? "ok" : "info";
+  return (
+    <Note kind={kind}>
+      <b>{t(`tools.job_${job.state}`, { tool })}</b>
+      <pre ref={ref} className="install-log mono" aria-live="polite">
+        {tail}
+      </pre>
+      {job.state === "running" && <p className="small muted" style={{ margin: "6px 0 0" }}>{t("tools.job_running_hint")}</p>}
+      {job.state === "failed" && (
+        <div className="row" style={{ marginTop: 8 }}>
+          <span className="small">{t("tools.job_failed_hint")}</span>
+          <Button variant="secondary" busy={busy} onClick={onRetry}>
+            {t("tools.retry")}
+          </Button>
+        </div>
+      )}
+    </Note>
+  );
+}
+
+export function InstanceDialog({ open, onClose, initial, preset, workdir: wantWorkdir, device: wantDevice, onSaved }) {
+  const { t } = useTranslation();
+  const { status: selectedStatus } = useStatus();
+  const devices = useDevices();
+  const editing = Boolean(initial);
+  // 多台电脑：新建时先选电脑（默认当前选中的那台）；编辑时就是终端所在的电脑。
+  const [device, setDevice] = useState(null);
+  useEffect(() => {
+    if (!open || !devices.multi) return;
+    setDevice(editing ? terminalDevice(initial.id) : (wantDevice ?? devices.selected));
+  }, [open]);
+  const dev = devices.multi ? device : null;
+  const client = deviceApi(dev);
+  // 不是当前选中的电脑时，用那台电脑自己的设置（默认目录、shell）与能力；字段缺失时退回选中电脑的
+  const [devStatus] = useLoad(
+    () => (open && dev && dev !== devices.selected ? client.get("/status").catch(() => null) : Promise.resolve(null)),
+    [open, dev],
+  );
+  const status = devStatus?.settings && devStatus?.capabilities ? devStatus : selectedStatus;
+  const workdirTouched = useRef(false);
+  const [launch, setLaunch] = useState("shell");
+  const [command, setCommand] = useState("");
+  const [shell, setShell] = useState("");
+  const [claudeProfile, setClaudeProfile] = useState(null);
+  const [codexProfile, setCodexProfile] = useState(null);
+  const [name, setName] = useState("");
+  const [workdir, setWorkdir] = useState("");
+  const [autoStart, setAutoStart] = useState(false);
+  const [fullAccess, setFullAccess] = useState(false);
+  const [chatUi, setChatUi] = useState(true);
+  const [mirror, setMirror] = useState("npmmirror");
+  const { busy, error, setError, run } = useAction();
+  const [tools, , reloadTools] = useLoad(
+    () => (open ? client.get("/tools") : Promise.resolve(null)),
+    [open, dev],
+  );
+  const [shells] = useLoad(
+    () => (open ? client.get("/shells") : Promise.resolve(null)),
+    [open, dev],
+  );
+  useEffect(() => {
+    if (!open) return;
+    setLaunch(initial?.launch ?? preset ?? "shell");
+    setCommand(initial?.command ?? "");
+    setShell(initial?.shell ?? "");
+    setName(initial?.name ?? "");
+    setWorkdir(initial?.workdir ?? (wantWorkdir || status.settings.default_workdir));
+    workdirTouched.current = Boolean(wantWorkdir);
+    setAutoStart(initial?.auto_start ?? false);
+    setFullAccess(initial?.full_access ?? false);
+    setChatUi(initial?.chat_ui ?? true);
+    setError(null);
+  }, [open]);
+  // 换了电脑：默认目录跟着换（用户自己改过就不动）
+  useEffect(() => {
+    if (open && !editing && !workdirTouched.current) setWorkdir(status.settings?.default_workdir ?? "");
+  }, [status]);
+  const editWorkdir = (v) => {
+    workdirTouched.current = true;
+    setWorkdir(v);
+  };
+  const canFull = FULL_ACCESS.includes(launch);
+  // 对话界面要靠会话保持（tmux）往同一个 Claude Code 里送输入
+  const canChat = CHAT_LAUNCHES.includes(launch) && Boolean(status.capabilities?.persistent);
+  // DSH 带着自己的端口和网页映射，编辑时不能和别的启动方式互换
+  const launches = editing
+    ? LAUNCHES.filter((l) => (l === "dsh") === (initial.launch === "dsh"))
+    : LAUNCHES;
+  const missing =
+    tools && AI_TOOLS.includes(launch) && !tools.tools[launch];
+  const submit = async (e) => {
+    e.preventDefault();
+    const body = {
+      name,
+      workdir,
+      launch,
+      command: launch === "custom" ? command : "",
+      shell: shell.trim(),
+      auto_start: autoStart,
+      full_access: canFull && fullAccess,
+      chat_ui: canChat && chatUi,
+      claude_profile: !editing && launch === "claude" && claudeProfile ? claudeProfile : undefined,
+      codex_profile: !editing && launch === "codex" && codexProfile ? codexProfile : undefined,
+    };
+    const r = await run(() =>
+      editing
+        ? api.patch(`/instances/${initial.id}`, body)
+        : client.post("/instances", { ...body, start: true }),
+    );
+    if (!r) return;
+    if (dev && r.id) rememberTerminals(dev, [r]);
+    onClose();
+    // 新建成功后不直接跳转，由列表页询问怎么打开（当前页小窗或新标签页）。
+    onSaved?.(editing ? null : r);
+  };
+  // 安装在后台进行（不建终端），进度就显示在这里；关掉对话框也不影响，再打开还能看到。
+  const [job, setJob] = useState(null);
+  useEffect(() => setJob(null), [open, launch, dev]);
+  useEffect(() => {
+    if (!open || !AI_TOOLS.includes(launch)) return undefined;
+    let alive = true;
+    let timer = null;
+    const poll = async () => {
+      const j = await client.get(`/tools/install/${launch}`).catch(() => null);
+      if (!alive) return;
+      setJob(j);
+      if (j?.state === "running") timer = setTimeout(poll, 1000);
+      else if (j?.state === "ok") reloadTools();
+    };
+    poll();
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [open, launch, dev, job?.started_at]);
+  const install = async () => {
+    const r = await run(() => client.post("/tools/install", { tool: launch, mirror }));
+    if (r) setJob(r);
+  };
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t(editing ? "form.edit_title" : "form.new_title")}
+    >
+      <form onSubmit={submit}>
+        {devices.multi && !editing && (
+          <Field label={t("devices.create_on")}>
+            <select value={device ?? ""} onChange={(e) => setDevice(e.target.value)}>
+              {devices.items.map((d) => (
+                <option key={d.id} value={d.id} disabled={!d.online}>
+                  {deviceName(t, d)}
+                  {d.os ? ` · ${osLabel(d.os)}` : ""}
+                  {d.online ? "" : ` · ${t("devices.offline")}`}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        <p className="field-label" style={{ margin: "0 0 8px" }}>
+          {t("form.launch")}
+        </p>
+        <div className="launch-grid" role="group" aria-label={t("form.launch")}>
+          {launches.map((l) => {
+            return (
+              <button
+                key={l}
+                type="button"
+                className="launch"
+                aria-pressed={launch === l}
+                onClick={() => setLaunch(l)}
+              >
+                <LaunchIcon launch={l} size={20} />
+                <b>{t(`launch.${l}.title`)}</b>
+                <span className="small muted">{t(`launch.${l}.desc`)}</span>
+              </button>
+            );
+          })}
+        </div>
+        {job?.tool === launch && (missing || job.state === "ok") ? (
+          <InstallProgress job={job} tool={t(`launch.${launch}.title`)} onRetry={install} busy={busy} />
+        ) : missing && (
+          <Note kind="warn">
+            <b>{t("tools.missing", { tool: t(`launch.${launch}.title`) })}</b>
+            {tools.tools.npm ? (
+              <>
+                <p style={{ margin: "4px 0 8px" }}>{t("tools.install_hint")}</p>
+                <div className="row">
+                  <select
+                    value={mirror}
+                    onChange={(e) => setMirror(e.target.value)}
+                    aria-label={t("tools.mirror")}
+                  >
+                    {["npmmirror", "tencent", "official"].map((m) => (
+                      <option key={m} value={m}>
+                        {t(`tools.mirrors.${m}`)}
+                      </option>
+                    ))}
+                  </select>
+                  <Button variant="secondary" busy={busy} onClick={install}>
+                    {t("tools.install")}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <p style={{ margin: "4px 0 0" }}>
+                {t("tools.need_node")}{" "}
+                <a
+                  href="https://nodejs.org/zh-cn/download"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {t("tools.node_link")}
+                </a>{" "}
+                <button
+                  type="button"
+                  className="btn btn-plain"
+                  style={{ minHeight: 28, padding: "0 4px" }}
+                  onClick={reloadTools}
+                >
+                  {t("tools.recheck")}
+                </button>
+              </p>
+            )}
+          </Note>
+        )}
+        {launch === "custom" && (
+          <Field label={t("form.command")} hint={t("form.command_hint")}>
+            <input
+              value={command}
+              onChange={(e) => setCommand(e.target.value)}
+              className="mono"
+              spellCheck={false}
+              autoComplete="off"
+              required
+              placeholder="npm run dev"
+            />
+          </Field>
+        )}
+        <Field label={t('form.name')} hint={t('form.name_hint')}>
+          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder={guessName(launch, workdir) || t(`launch.${launch}.title`)} />
+        </Field>
+        {launch === "dsh" && <Note>{t("dsh.form_note")}</Note>}
+        <FolderField
+          value={workdir}
+          onChange={editWorkdir}
+          client={client}
+          hint={launch === "dsh" ? t("dsh.workdir_hint") : undefined}
+        />
+        <ShellPicker
+          value={shell}
+          onChange={setShell}
+          data={shells}
+          inherit={status.settings?.default_shell || null}
+        />
+        {!editing && launch === "codex" && (
+          <CodexProfilePick
+            client={client}
+            device={dev}
+            value={codexProfile}
+            onChange={setCodexProfile}
+            className="btn btn-secondary cprof-form-pick"
+          />
+        )}
+        {!editing && launch === "claude" && (
+          <ClaudeProfilePick
+            client={client}
+            device={dev}
+            value={claudeProfile}
+            onChange={setClaudeProfile}
+            className="btn btn-secondary cprof-form-pick"
+          />
+        )}
+        {canFull && (
+          <div style={{ marginBottom: 12 }}>
+            <label
+              className="row"
+              style={{ alignItems: "flex-start", gap: 8, cursor: "pointer" }}
+            >
+              <input
+                type="checkbox"
+                checked={fullAccess}
+                onChange={(e) => setFullAccess(e.target.checked)}
+                style={{ marginTop: 3 }}
+              />
+              <span>
+                <b style={{ fontSize: 14 }}>{t("form.full_access")}</b>
+                <span className="field-hint" style={{ display: "block" }}>
+                  {t(`form.full_access_hint_${launch}`)}
+                </span>
+              </span>
+            </label>
+          </div>
+        )}
+        {canChat && (
+          <label
+            className="row"
+            style={{ alignItems: "flex-start", gap: 8, cursor: "pointer", marginBottom: 12 }}
+          >
+            <input
+              type="checkbox"
+              checked={chatUi}
+              onChange={(e) => setChatUi(e.target.checked)}
+              style={{ marginTop: 3 }}
+            />
+            <span>
+              <b style={{ fontSize: 14 }}>{t("form.chat_ui")}</b>
+              <span className="field-hint" style={{ display: "block" }}>
+                {launch === "codex" ? t("form.chat_ui_hint_codex") : t(editing && !initial?.chat_ui ? "form.chat_ui_hint_restart" : "form.chat_ui_hint")}
+              </span>
+            </span>
+          </label>
+        )}
+        {status.capabilities?.persistent && (
+          <div className="between" style={{ marginBottom: 12 }}>
+            <span className="grow">
+              <b style={{ fontSize: 14 }}>{t("form.auto_start")}</b>
+              <span className="field-hint" style={{ display: "block" }}>
+                {t("form.auto_start_hint")}
+              </span>
+            </span>
+            <Switch
+              checked={autoStart}
+              onChange={setAutoStart}
+              label={t("form.auto_start")}
+            />
+          </div>
+        )}
+        {editing && initial.running && <Note>{t("form.restart_note")}</Note>}
+        <ErrorNote error={error} />
+        <div className="modal-actions">
+          <Button variant="ghost" onClick={onClose}>
+            {t("action.cancel")}
+          </Button>
+          <Button type="submit" busy={busy}>
+            {t(editing ? "action.save" : "form.create")}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+export function LogsDialog({ inst, onClose }) {
+  const { t } = useTranslation();
+  const [data, error] = useLoad(
+    () =>
+      inst ? api.get(`/instances/${inst.id}/logs`) : Promise.resolve(null),
+    [inst?.id],
+  );
+  return (
+    <Modal
+      open={Boolean(inst)}
+      onClose={onClose}
+      title={t("instance.logs_title", { name: inst?.name ?? "" })}
+    >
+      <p className="muted small">{t("instance.logs_hint")}</p>
+      <ErrorNote error={error} />
+      {data ? (
+        <>
+          <p className="small" style={{ margin: "8px 0 4px" }}>
+            <b>{t("instance.history_state")}</b>{" "}
+            {t(`instance.state.${stateOf(data)}`)}
+            {data.started_at && (
+              <>
+                {" "}
+                ·{" "}
+                {t("instance.history_started", {
+                  when: relativeTime(t, data.started_at),
+                })}
+              </>
+            )}
+            {data.last_activity_at && (
+              <>
+                {" "}
+                ·{" "}
+                {t("instance.last_activity", {
+                  when: relativeTime(t, data.last_activity_at),
+                })}
+              </>
+            )}
+          </p>
+          <p className="small" style={{ margin: "8px 0 4px" }}>
+            <b>{t("instance.history_output")}</b>
+          </p>
+          <div className="log-box">
+            {data.output || t("instance.history_output_empty")}
+          </div>
+          <p className="small" style={{ margin: "12px 0 4px" }}>
+            <b>{t("instance.history_service")}</b>
+          </p>
+          <div className="log-box">{data.text || t("instance.logs_empty")}</div>
+        </>
+      ) : (
+        <Skeleton height={120} />
+      )}
+      <div className="modal-actions">
+        <Button variant="ghost" onClick={onClose}>
+          {t("action.close")}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+export function Promotions() {
+  const { t, i18n } = useTranslation();
+  const [data] = useLoad(
+    () => api.get(`/promotions?locale=${i18n.language}`),
+    [i18n.language],
+  );
+  if (!data?.items?.length) return null;
+  return data.items.map((p) => (
+    <a
+      key={p.id}
+      href={p.url}
+      target="_blank"
+      rel="noopener noreferrer sponsored"
+      className="card promo between"
+      style={{ color: "inherit" }}
+    >
+      <span className="grow">
+        <span className="badge">{t("promotion.label")}</span> <b>{p.title}</b>
+        {p.body && (
+          <span
+            className="muted small"
+            style={{ display: "block", marginTop: 4 }}
+          >
+            {p.body}
+          </span>
+        )}
+      </span>
+      <ExternalLink size={18} className="muted" />
+    </a>
+  ));
+}

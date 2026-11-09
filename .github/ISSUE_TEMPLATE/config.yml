@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability / 安全漏洞
+    url: https://github.com/z892137292/look/security/advisories/new
+    about: Report privately, please don't open a public issue. / 请私下报告，不要公开提 Issue。

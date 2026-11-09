@@ -1,0 +1,9 @@
+/id_*
+*.pem
+.DS_Store
+
+# 本地文件，不上传
+/dist/
+/build.log
+/deploy.sh
+__pycache__/
