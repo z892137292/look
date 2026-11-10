@@ -1,4 +1,4 @@
-//! 本机接口 `/api/*`（管理台使用）。写请求要求 `X-Look-Client: 1` 且 `Origin` 为本站，
+//! 本机接口 `/api/*`（管理台使用）。写请求要求 `X-Looklook-Client: 1` 且 `Origin` 为本站，
 //! 跨站页面既带不上自定义头（需要预检，本服务不响应 CORS），也伪造不了来源。
 
 use axum::extract::{DefaultBodyLimit, Path, Query, Request, State};
@@ -228,6 +228,9 @@ async fn guard(req: Request, next: Next) -> Response {
             // Keep existing local CLI callers working during an upgrade.
             || (access.is_local() && req.headers().get("x-ll-client").and_then(|v| v.to_str().ok()) == Some("1"));
         if !marked || !origin_matches(req.headers(), &access) {
+            let hv = |n: &str| req.headers().get(n).and_then(|v| v.to_str().ok()).unwrap_or("-").to_owned();
+            tracing::warn!(path = %req.uri().path(), method = %req.method(), marked, origin = %hv("origin"),
+                host = %hv("host"), ua = %hv("user-agent"), "CSRF_FAILED");
             return LocalError::new("CSRF_FAILED").into_response();
         }
     }

@@ -9,7 +9,7 @@ const BASE = rtcMode ? '/_ll/web' : '/api/platform';
 
 async function request(method, path, body) {
   const headers = { Accept: 'application/json' };
-  if (method !== 'GET') headers['X-Look-Client'] = '1';
+  if (method !== 'GET') headers['X-Looklook-Client'] = '1';
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   let res;
   try {
