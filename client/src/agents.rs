@@ -479,7 +479,7 @@ fn opencode_edit(raw: &str, entry: Option<(&str, &str)>) -> anyhow::Result<Optio
     Ok(Some(serde_json::to_string_pretty(&doc)? + "\n"))
 }
 
-const DSH_BEGIN: &str = "# >>> looklook (managed by Look; changes inside are overwritten) >>>";
+const DSH_BEGIN: &str = "# >>> looklook (managed by Looklook; changes inside are overwritten) >>>";
 const DSH_END: &str = "# <<< looklook <<<";
 
 /// 找到我们写的一段（含首尾标记行）。
@@ -542,7 +542,7 @@ fn dsh_edit(raw: &str, entry: Option<(&str, &str)>) -> anyhow::Result<Option<Str
 
 const DSH_WEB_PLUGIN: &str = include_str!("dsh-web-url.mjs");
 const DSH_WEB_PLUGIN_FILE: &str = "web-url.mjs";
-const DSH_WEB_BEGIN: &str = "# >>> looklook web (managed by Look; changes inside are overwritten) >>>";
+const DSH_WEB_BEGIN: &str = "# >>> looklook web (managed by Looklook; changes inside are overwritten) >>>";
 const DSH_WEB_END: &str = "# <<< looklook web <<<";
 
 /// `$DSH_HOME/looklook`：插件和它写的地址文件都在这里
