@@ -5,7 +5,7 @@
 //!   `assistant` 记录的 `message.usage`。同一条回复会写好几行（每个内容块一行），按 `message.id` + `requestId` 只算一次。
 //! - **Codex**：`$CODEX_HOME/sessions/**/rollout-*.jsonl` 和 `archived_sessions/`。`token_count` 事件的 `last_token_usage`
 //!   是一次请求的用量；`total_token_usage` 没变的是重复发的，不算。模型取前面最近的 `turn_context`，
-//!   走的哪家取开头 `session_meta` 的 `model_provider`（看看的第三方接口是 `looklook-<配置 ID>`，见 codex_profiles.rs）。
+//!   走的哪家取开头 `session_meta` 的 `model_provider`（Look 的第三方接口是 `looklook-<配置 ID>`，见 codex_profiles.rs）。
 //! - 接着以前的对话、分叉出来的对话会把以前的记录抄进新文件：每条用量记一个指纹，别的文件算过的不再算。
 //! - 只重新读变过（长度或修改时间变了）的文件。删掉的会话记录（Claude Code 默认 30 天清理）统计照样留着。
 //! - 结果存在 `<数据目录>/usage/stats.json`，只在本机，不上传。

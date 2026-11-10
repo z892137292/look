@@ -1,4 +1,4 @@
-// 账户与安全：显示名称、邮箱、专属地址、修改密码、网页登录（浏览器）。数据来自看看平台（shared/platform.js）；
+// 账户与安全：显示名称、邮箱、专属地址、修改密码、网页登录（浏览器）。数据来自 Look 平台（shared/platform.js）；
 // 连不上平台时显示这台电脑上缓存的账户信息。
 import { KeyRound, LogOut, MonitorSmartphone, PenLine } from 'lucide-react';
 import { useState } from 'react';

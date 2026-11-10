@@ -82,7 +82,7 @@ impl Fake {
                 match (method.as_str(), p) {
                     (_, "/open-apis/auth/v3/tenant_access_token/internal") => axum::Json(json!({ "code": 0, "msg": "ok", "tenant_access_token": "t-1", "expire": 7200 })).into_response(),
                     (_, "/callback/ws/endpoint") => ok(json!({ "URL": ws_url, "ClientConfig": { "PingInterval": 30 } })),
-                    (_, "/open-apis/bot/v3/info") => axum::Json(json!({ "code": 0, "msg": "ok", "bot": { "open_id": "ou_bot", "app_name": "看看" } })).into_response(),
+                    (_, "/open-apis/bot/v3/info") => axum::Json(json!({ "code": 0, "msg": "ok", "bot": { "open_id": "ou_bot", "app_name": "Look" } })).into_response(),
                     ("POST", "/open-apis/cardkit/v1/cards") => ok(json!({ "card_id": format!("c{n}") })),
                     ("PUT", p) if p.contains("/elements/") => {
                         // 第 3 次推文本时假装流式已经自动关了（200850），看会不会重新打开再推
@@ -107,7 +107,7 @@ impl Fake {
             }
         });
         tokio::spawn(async move { axum::serve(http, router).await.unwrap() });
-        // 长连接：只接一条（看看每台电脑连一条）
+        // 长连接：只接一条（Look 每台电脑连一条）
         let (pending, connected) = (fake.pending.clone(), fake.connected.clone());
         tokio::spawn(async move {
             let mut rx = rx;

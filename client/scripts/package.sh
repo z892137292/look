@@ -5,13 +5,13 @@
 #   scripts/package.sh linux-x86_64 ...      指定平台：linux-x86_64 linux-aarch64 darwin-aarch64 windows-x86_64
 #
 # 安装包内容（顶层目录 looklook/）：looklook 可执行文件、trzsz/（trz、tsz；Windows 上是顶层的 trz.exe、tsz.exe）、ttyd 1.7.7（改名为 looklook-term）、会话保持程序（tmux 改名为 looklook-mux；Windows 上的 psmux 保留原名 psmux.exe，见 src/paths.rs 的 MUX_EXE）、终端字体、许可证、安装脚本。
-# Linux 包可直接用看看网页“下载”页的一行命令安装：curl -fsSL <地址> | tar -xz && ./looklook/install.sh
+# Linux 包可直接用 Look 网页“下载”页的一行命令安装：curl -fsSL <地址> | tar -xz && ./looklook/install.sh
 #
 # Windows / macOS 另外生成桌面应用安装程序（Tauri，见 src/desktop.rs 与 tauri.conf.json），给普通用户双击安装：
-#   looklook-{版本}-windows-x86_64-setup.exe   NSIS 安装程序（装到 %LOCALAPPDATA%\Looklook，开始菜单、登录自启）
-#   looklook-{版本}-darwin-aarch64.dmg         拖进“应用程序”的 Looklook.app（没有 Apple 公证，签名见下面的 LOOKLOOK_MACOS_SIGN_IDENTITY）
+#   looklook-{版本}-windows-x86_64-setup.exe   NSIS 安装程序（装到 %LOCALAPPDATA%\Look，开始菜单、登录自启）
+#   looklook-{版本}-darwin-aarch64.dmg         拖进“应用程序”的 Look.app（没有 Apple 公证，签名见下面的 LOOKLOOK_MACOS_SIGN_IDENTITY）
 # 压缩包里的 looklook 就是同一个桌面应用程序，仍然用于自动更新（src/updater.rs 只认 zip / tar.gz）；
-# macOS 的压缩包里另外带着整个 Looklook.app，应用自动更新时整个替换（保持签名完整）。
+# macOS 的压缩包里另外带着整个 Look.app，应用自动更新时整个替换（保持签名完整）。
 # 额外需要：Tauri CLI（npm ci 装的 @tauri-apps/cli，或 cargo-tauri）；在 Linux 上打 Windows 包还要
 # x86_64-w64-mingw32-windres（binutils-mingw-w64-x86-64，嵌入图标与清单；预处理用 zig，见 scripts/windres-zig.sh）和 makensis（nsis）；
 # Tauri CLI 在 Linux 上还会用 pkg-config 查 appindicator（libayatana-appindicator3-dev），即使目标是 Windows。
@@ -176,13 +176,13 @@ PY
       rm -rf "${stage:?}/$n"
       ln -s "../$app/Contents/Resources/$n" "$stage/$n"
     done
-    # 打开 .dmg 看到 Looklook.app 和“应用程序”快捷方式，拖过去即可安装
+    # 打开 .dmg 看到 Look.app 和“应用程序”快捷方式，拖过去即可安装
     local dmgdir i
     dmgdir=$(mktemp -d)
     cp -R "$out"/macos/*.app "$dmgdir/"
     ln -s /Applications "$dmgdir/Applications"
     for i in 1 2 3; do
-      hdiutil create -volname Looklook -srcfolder "$dmgdir" -ov -format UDZO "$DIST/looklook-$VERSION-$t.dmg" && break
+      hdiutil create -volname Look -srcfolder "$dmgdir" -ov -format UDZO "$DIST/looklook-$VERSION-$t.dmg" && break
       [[ $i == 3 ]] && { echo "生成 .dmg 失败" >&2; return 1; }
       echo "  hdiutil 失败，10 秒后重试（$i/3）" >&2
       sleep 10

@@ -133,7 +133,7 @@ pub struct Resume {
     pub fork: bool,
 }
 
-/// 这个终端接着的是哪个对话（`instance_resume.{id}`），以前的对话列表据此标出“已在看看里”
+/// 这个终端接着的是哪个对话（`instance_resume.{id}`），以前的对话列表据此标出“已在 Look 里”
 pub fn resume_key(id: &str) -> String {
     format!("instance_resume.{id}")
 }
@@ -1039,7 +1039,7 @@ impl Instances {
 
     /// 启动类型对应的命令行（含“全部权限”参数）；普通终端为 None。
     fn launch_command(&self, row: &InstanceRow) -> Option<String> {
-        // 对话模式的 Codex：终端里是接到看看的 app-server 上的 TUI，和对话界面是同一个会话（还没起 app-server 时是 shell）
+        // 对话模式的 Codex：终端里是接到 Look 的 app-server 上的 TUI，和对话界面是同一个会话（还没起 app-server 时是 shell）
         if self.codex_app_mode(row) {
             return self.codex_tui_command(row);
         }
@@ -1076,7 +1076,7 @@ impl Instances {
         }
     }
 
-    /// 对话模式的 Codex：对话由看看通过 `codex app-server` 驱动，终端里是同一个工作目录下的普通 shell。
+    /// 对话模式的 Codex：对话由 Look 通过 `codex app-server` 驱动，终端里是同一个工作目录下的普通 shell。
     pub fn codex_app_mode(&self, row: &InstanceRow) -> bool {
         row.launch == "codex" && self.opts(&row.id).chat_ui && matches!(self.backend, Backend::Tmux(_)) && self.container(&row.id).is_none()
     }
@@ -1111,15 +1111,15 @@ impl Instances {
     }
 
     /// 对话模式的 Codex 终端里跑的 TUI：`codex [--yolo] resume <会话> --remote ws://127.0.0.1:<端口> …`，
-    /// 接到看看起的 app-server 上（见 `chat::codex_app`）。app-server 还没起时 None。
+    /// 接到 Look 起的 app-server 上（见 `chat::codex_app`）。app-server 还没起时 None。
     /// app-server 用不了（起不来、连不上）时改成本机直接运行同一个会话的 Codex：对话界面暂时不可用，终端照常能用。
     fn codex_tui_command(&self, row: &InstanceRow) -> Option<String> {
         let opts = self.opts(&row.id);
         // 对话还没有记录文件（新开的、还没聊过）时 TUI 接不上它（thread/resume 报 no rollout found）：
-        // 不带会话号启动，让 TUI 自己开一段，看看收到 thread/started 再认领（见 chat::codex_chat 的 codex_claim_thread）
+        // 不带会话号启动，让 TUI 自己开一段，Look 收到 thread/started 再认领（见 chat::codex_chat 的 codex_claim_thread）
         let thread = crate::chat::binding(&self.store, &row.id).filter(|b| b.transcript_path.is_file()).map(|b| b.session_id);
         Some(match crate::chat::codex_app::endpoint() {
-            // 接在 app-server 上的 TUI 不带权限参数（--yolo）：权限只由看看在 app-server 上设（thread/start、thread/resume、
+            // 接在 app-server 上的 TUI 不带权限参数（--yolo）：权限只由 Look 在 app-server 上设（thread/start、thread/resume、
             // 认领时的 thread/settings/update）。带了的话 TUI 里 /resume、换会话会报
             // “Permission overrides are not supported when resuming a remote task.”
             Some(ep) => {
@@ -1194,7 +1194,7 @@ impl Instances {
         v
     }
 
-    /// 连哪个 tmux 服务器。测试里用各自数据目录下的 socket：用 `-L looklook` 会连到这台机器上正在用的看看，
+    /// 连哪个 tmux 服务器。测试里用各自数据目录下的 socket：用 `-L looklook` 会连到这台机器上正在用的 Look，
     /// 测试里的 `kill-server` 会把用户所有的终端都结束掉
     pub(crate) fn tmux_socket_args(&self) -> Vec<String> {
         if cfg!(all(test, windows)) {
@@ -1441,7 +1441,7 @@ impl Instances {
     }
 
     /// 结束游离的 tmux 会话：终端已经删了、或者已经停止了，会话却还在（停止时 kill-session 没成功、客户端在中途被结束）。
-    /// 只看看看自己的 tmux 服务里 `ll_<终端 ID>` 这样的会话；连着两次（间隔 [`ORPHAN_SWEEP`]）都是游离的才结束，
+    /// 只 Look 看自己的 tmux 服务里 `ll_<终端 ID>` 这样的会话；连着两次（间隔 [`ORPHAN_SWEEP`]）都是游离的才结束，
     /// 避免和正在新建、启动的终端撞上。返回这一次看到的游离会话，下一次用。
     async fn sweep_orphans(&self, before: HashSet<String>) -> HashSet<String> {
         let _g = self.op.lock().await;
@@ -1605,7 +1605,7 @@ pub fn launch_command_line(row: &InstanceRow, opts: Opts, root: bool) -> Option<
 
 /// 对话界面：启动命令前加终端标识，后面加 hooks 配置（`--settings`），要接着某个会话时加 `--resume`。
 /// 环境变量用 POSIX 写法，PowerShell / cmd 由 shells.rs 改成各自的写法。
-/// 对话界面的启动命令：Claude Code 加 `--settings`，Codex 选用看看的 profile。
+/// 对话界面的启动命令：Claude Code 加 `--settings`，Codex 选用 Look 的 profile。
 fn with_chat(row: &InstanceRow, cmd: &str, settings: &Path, resume: Option<&str>) -> String {
     with_chat_hooks(cmd, &row.id, settings, resume)
 }
@@ -1749,7 +1749,7 @@ impl Instances {
         }
         // psmux 按 USERPROFILE 找会话登记文件（端口、密钥），每次启动还会清理“没有登记的”会话进程。
         // 我们启动的、ttyd 启动的、开机自启时环境不同的进程必须看到同一个目录，否则会互相找不到、
-        // 甚至把对方的会话当孤儿结束——关掉网页再打开就接不回原来的终端。放在看看自己的数据目录，
+        // 甚至把对方的会话当孤儿结束——关掉网页再打开就接不回原来的终端。放在 Look 自己的数据目录，
         // 也和用户自己用的 psmux 互不干扰。预热会话（warm）是给交互使用的提速，这里只会多出空闲进程。
         if cfg!(windows) {
             cmd.env("PSMUX_DATA_DIR", self.paths.home.join("mux")).env("PSMUX_NO_WARM", "1");
@@ -1815,10 +1815,10 @@ fn write_tmux_conf(path: &Path) -> std::io::Result<()> {
     };
     // Windows 的 psmux 只给它认识的选项（未知选项可能让配置整体加载失败）。
     let conf = if cfg!(windows) {
-        "# 由看看客户端生成，请勿修改\nset -g mouse on\nset -g status off\nset -g history-limit 50000\nset -g escape-time 10\n".to_string()
+        "# 由 Look 客户端生成，请勿修改\nset -g mouse on\nset -g status off\nset -g history-limit 50000\nset -g escape-time 10\n".to_string()
     } else {
         format!(
-        "# 由看看客户端生成，请勿修改\n\
+        "# 由 Look 客户端生成，请勿修改\n\
          set -g mouse on\nset -g status off\nset -g history-limit 50000\nset -g escape-time 10\n\
          set -g focus-events on\nset -g set-clipboard on\nset -g default-terminal \"{term}\"\n\
          set -ga terminal-overrides \",xterm-256color:RGB\"\nsetw -g aggressive-resize on\n\

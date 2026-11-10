@@ -1,4 +1,4 @@
-// 电脑：这个账户登录着的全部电脑（数据来自看看平台，见 shared/platform.js），可以切换、改名、让一台退出登录（密码 + 邮箱验证码）。
+// 电脑：这个账户登录着的全部电脑（数据来自 Look 平台，见 shared/platform.js），可以切换、改名、让一台退出登录（密码 + 邮箱验证码）。
 // “切换到这台”就是顶栏的电脑切换：远程打开和本机 App 都能切（App 经本机客户端连过去）；连不上平台、只有一台时只管本机。
 // 每台都能在浏览器里打开（专属地址 ?d={id} 直接连那台）。
 import { ExternalLink, History, Laptop, LogOut, MoreHorizontal, Pencil, Plus } from 'lucide-react';

@@ -20,7 +20,7 @@ export function useDevices() {
   return useContext(Ctx);
 }
 
-/** 记住的电脑；地址带 ?d={id}（“电脑”页、看看网页上指定了某台电脑的链接）时用它，并从地址里去掉。 */
+/** 记住的电脑；地址带 ?d={id}（“电脑”页、Look 网页上指定了某台电脑的链接）时用它，并从地址里去掉。 */
 function stored() {
   const u = new URL(window.location.href);
   const want = u.searchParams.get('d');
@@ -162,7 +162,7 @@ export function deviceName(t, d) {
  * - 按电脑的页面（本机网页、系统、设置）：选一台就切换到那台；
  * - 终端页（合并显示所有电脑）：按钮写“N 台电脑”，点一台跳到它的终端分组。
  * 第一次看到时在按钮下面提示一次“在这里切换电脑”，免得用户不知道有这个入口。
- * `helpUrl`：多台电脑的说明（看看网页的常见问题）。
+ * `helpUrl`：多台电脑的说明（Look 网页的常见问题）。
  * `side`：侧栏“工具”上方的整行样式，表示下面的工具作用在哪台电脑上。
  */
 export function DeviceSwitcher({ perDevice, helpUrl, side = false }) {

@@ -1,4 +1,4 @@
-// 登录：用看看账户登录这台电脑，开通远程访问（本机、局域网不登录也能用）。每个账户同时登录的电脑数有上限（平台判定，默认 7 台）。
+// 登录：用 Look 账户登录这台电脑，开通远程访问（本机、局域网不登录也能用）。每个账户同时登录的电脑数有上限（平台判定，默认 7 台）。
 // `drawer`：在本机管理台的抽屉里（标题由抽屉显示）；否则是远程打开时的整页登录。
 import { LogIn } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -67,7 +67,7 @@ function DeviceLimit({ params }) {
   );
 }
 
-/** 给第一次打开、还不知道看看是做什么的用户：几个最常见的问题。 */
+/** 给第一次打开、还不知道 Look 是做什么的用户：几个最常见的问题。 */
 function WhatIsThis() {
   const { t } = useTranslation();
   return (

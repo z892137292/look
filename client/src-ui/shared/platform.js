@@ -1,4 +1,4 @@
-// 账户接口（电脑、会员、邀请、账户与安全），数据在看看平台上：
+// 账户接口（电脑、会员、邀请、账户与安全），数据在 Look 平台上：
 // - 远程打开（WebRTC，顶层是平台的启动页）：直接请求用户站的 /_ll/web/*，不经过电脑，电脑离线或还在连接时也能用；
 // - 本机、局域网打开：请求这台电脑的 /api/platform/*，由它签名转发到平台（客户端 gateway/api.rs）。
 // 错误和本机接口一样抛出 ApiError。
@@ -9,7 +9,7 @@ const BASE = rtcMode ? '/_ll/web' : '/api/platform';
 
 async function request(method, path, body) {
   const headers = { Accept: 'application/json' };
-  if (method !== 'GET') headers['X-Looklook-Client'] = '1';
+  if (method !== 'GET') headers['X-Look-Client'] = '1';
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   let res;
   try {

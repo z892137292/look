@@ -111,7 +111,7 @@ pub fn open_url(url: &str) -> bool {
 ///
 /// libdatachannel（`datachannel::preload` 提前初始化了）的线程池、OpenSSL 都是全局对象；`exit()` 在主线程析构它们时，
 /// 后台线程（tokio、WebRTC）还在用，或者析构到还在运行的 `std::thread` 就 `std::terminate`，进程收到 SIGABRT / SIGSEGV。
-/// macOS 关机、重启时退出走的就是这条路，下次登录弹出“Looklook 意外退出”。该收尾的（终端、通道）这时都已经做完了。
+/// macOS 关机、重启时退出走的就是这条路，下次登录弹出“Look 意外退出”。该收尾的（终端、通道）这时都已经做完了。
 pub fn exit_now(code: i32) -> ! {
     let _ = std::io::stdout().flush();
     let _ = std::io::stderr().flush();

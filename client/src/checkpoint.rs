@@ -3,7 +3,7 @@
 //!
 //! - 快照：复制仓库的 index 到临时文件，`GIT_INDEX_FILE=临时 git add -A`（沿用 `.gitignore`，未跟踪的新文件也算），
 //!   `write-tree`，`commit-tree`（父提交是 HEAD）。**不动用户的 index、HEAD、分支、stash，也不建 ref**：
-//!   ref 会出现在 `git log --all` 里、被 `push --mirror` 推走。提交只记在看看自己的数据库里（每个会话最近 20 个），
+//!   ref 会出现在 `git log --all` 里、被 `push --mirror` 推走。提交只记在 Look 自己的数据库里（每个会话最近 20 个），
 //!   git 清理没人引用的对象至少等两周（`gc.pruneExpire`），对“回到前几轮”够用；真被清掉了就提示没法恢复。
 //! - 复制 index 是为了用上已有的文件状态缓存，大仓库也快（连修改时间一起保留，git 才会照常复查刚改过的文件）；
 //!   超过 10 秒就放弃这一次。
@@ -112,10 +112,10 @@ pub fn take(store: &Store, inst: &str, workdir: &Path, label: &str, before_resto
     if let Some(h) = head.as_deref() {
         args.extend(["-p", h]);
     }
-    let msg = if label.is_empty() { "Looklook checkpoint".to_string() } else { format!("Looklook checkpoint: {label}") };
+    let msg = if label.is_empty() { "Look checkpoint".to_string() } else { format!("Look checkpoint: {label}") };
     args.extend(["-m", msg.as_str()]);
     // 用户可能没设置名字和邮箱
-    let who = std::ffi::OsStr::new("Looklook");
+    let who = std::ffi::OsStr::new("Look");
     let mail = std::ffi::OsStr::new("checkpoint@looklook.local");
     let env = [("GIT_AUTHOR_NAME", who), ("GIT_AUTHOR_EMAIL", mail), ("GIT_COMMITTER_NAME", who), ("GIT_COMMITTER_EMAIL", mail)];
     let commit = git(&root, &args, &env, TAKE_TIMEOUT)?;

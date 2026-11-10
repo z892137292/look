@@ -528,7 +528,7 @@ impl Account {
         .map_err(internal)?;
         self.persist_clock();
         self.request_terminal_report();
-        tracing::info!("已登录看看服务端");
+        tracing::info!("已登录 Look 服务端");
         Ok(())
     }
 
@@ -662,7 +662,7 @@ impl Account {
             }
         }
         *lock_mut(&self.revoked) = r.revoked_sids.into_iter().collect();
-        // 在看看网页上改了电脑名称：同步到本机设置（与心跳同在 busy 锁里，本机同时改名时以本机为准）。
+        // 在 Look 网页上改了电脑名称：同步到本机设置（与心跳同在 busy 锁里，本机同时改名时以本机为准）。
         if let Some(name) = r.device_name.filter(|n| !n.is_empty()) {
             let mut settings = Settings::load(&self.store);
             if name != settings.device_name() {
@@ -965,7 +965,7 @@ impl Account {
         r
     }
 
-    /// 本机网页的临时分享（只给指定的看看账户，到期自动失效）。
+    /// 本机网页的临时分享（只给指定的 Look 账户，到期自动失效）。
     pub async fn page_shares(&self, id: &str) -> PResult<PageShareList> {
         self.signed("GET", &format!("/tunnels/{}/shares", path_seg(id)), None::<&()>).await
     }

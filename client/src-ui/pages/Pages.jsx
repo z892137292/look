@@ -1,5 +1,5 @@
 // 本机网页：把电脑上正在运行的网页（例如 localhost:5173）放到自己的专属地址下，在外面也能打开。
-// 每个账户最多 10 个；只有本人登录后才能打开，或在有效期内临时分享给指定的看看账户。数据登记在看看服务端。
+// 每个账户最多 10 个；只有本人登录后才能打开，或在有效期内临时分享给指定的 Look 账户。数据登记在 Look 服务端。
 // 上面列出这台电脑上正在监听的端口（docs/PLAN_2026-10-27.md §1），点一下转成网页，不用记端口号。
 import { AlertTriangle, Bot, ExternalLink, Globe, Plus, Radar, RefreshCw, Trash2, UserPlus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -18,7 +18,7 @@ import { RemoteUpsell, remoteAllowed } from '../shared/Remote.jsx';
 const SHARE_HOURS = [1, 24, 72, 168];
 
 /**
- * 临时分享：在有效期内允许指定的看看账户打开这个网页。对方用自己的账户登录后打开网页地址即可，
+ * 临时分享：在有效期内允许指定的 Look 账户打开这个网页。对方用自己的账户登录后打开网页地址即可，
  * 到期或取消后马上失效。分享出去等于让对方使用这台电脑上的这个服务，所以先给出醒目的安全提醒、要求确认。
  */
 function ShareDialog({ page, onClose }) {

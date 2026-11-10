@@ -1,6 +1,6 @@
 //! 和 `codex app-server` 说话（docs/CODEX_UI.md §4）：JSON-RPC，每条消息一帧，走本机 WebSocket。
 //!
-//! 看看起一个 app-server（`--listen ws://127.0.0.1:<端口>`，带随机口令），所有对话模式的 Codex 终端共用，
+//! Look 起一个 app-server（`--listen ws://127.0.0.1:<端口>`，带随机口令），所有对话模式的 Codex 终端共用，
 //! 每个终端是其中的一个 thread。终端标签里的 Codex TUI 用 `codex resume <thread> --remote <地址>` 接到同一个
 //! app-server 上，两边是同一个会话的两个视图：谁发的消息、谁答的审批，另一边都实时看到。
 //!
@@ -36,7 +36,7 @@ pub const TOKEN_ENV: &str = "LOOKLOOK_CODEX_TOKEN";
 #[derive(Debug)]
 pub enum Incoming {
     Notification { method: String, params: Value },
-    /// 要看看答复的请求（审批、提问）：答复用 [`AppServer::respond`]
+    /// 要 Look 答复的请求（审批、提问）：答复用 [`AppServer::respond`]
     Request { id: Value, method: String, params: Value },
     /// 连接断了
     Closed,
@@ -130,7 +130,7 @@ pub async fn program(shell: &str) -> PathBuf {
     PathBuf::from("codex")
 }
 
-/// 口令：第一次用时生成，之后一直用同一个（只有本机的看看和终端里的 TUI 读得到）
+/// 口令：第一次用时生成，之后一直用同一个（只有本机的 Look 和终端里的 TUI 读得到）
 fn token(run: &Path) -> std::io::Result<(PathBuf, String)> {
     let path = run.join("codex-app.token");
     if let Ok(t) = std::fs::read_to_string(&path) {
@@ -222,7 +222,7 @@ impl AppServer {
         let me = Self::connect(&url, &token, signature, pid, state_file, tx).await?;
         *lock(&ENDPOINT) = Some(Endpoint { url, token_file });
         let init = json!({
-            "clientInfo": { "name": "looklook", "title": "Looklook", "version": env!("CARGO_PKG_VERSION") },
+            "clientInfo": { "name": "looklook", "title": "Look", "version": env!("CARGO_PKG_VERSION") },
             "capabilities": { "experimentalApi": true, "requestAttestation": false },
         });
         me.call("initialize", init).await?;
@@ -436,7 +436,7 @@ fn log_tail(run: &Path) -> String {
 }
 
 /// app-server 用不了时终端里直接运行的 Codex（同一个会话，`--no-daemon`）：对话界面暂时不可用，但终端照常能用。
-/// 对话界面据此认出“这是看看开的、只是暂时走终端”（[`super::codex_chat`]），不当成别人开的。
+/// 对话界面据此认出“这是 Look 开的、只是暂时走终端”（[`super::codex_chat`]），不当成别人开的。
 pub fn local_command(base: &str, thread: Option<&str>) -> String {
     match thread.filter(|t| crate::history::valid_id(t)) {
         Some(t) => format!("{base} {NO_UPDATE_PROMPT} --no-daemon resume {t}"),
@@ -444,13 +444,13 @@ pub fn local_command(base: &str, thread: Option<&str>) -> String {
     }
 }
 
-/// 看看开的 TUI 不弹“Update available”：这个框对话页看不到，只会把终端卡住；在终端里选“Update now”还会在
-/// app-server 运行时替换 codex。新版本由看看自己查、在对话页提示（`codex_chat::codex_update_info`）。
+/// Look 开的 TUI 不弹“Update available”：这个框对话页看不到，只会把终端卡住；在终端里选“Update now”还会在
+/// app-server 运行时替换 codex。新版本由 Look 自己查、在对话页提示（`codex_chat::codex_update_info`）。
 /// 值里没有引号，PowerShell、cmd、psmux 都原样传
 const NO_UPDATE_PROMPT: &str = "-c check_for_update_on_startup=false";
 
 /// 终端里接到同一个 app-server 的 Codex TUI：`<codex 命令> resume <thread> --remote <地址> --remote-auth-token-env …`；
-/// 还没有会话时开一个新的（app-server 会通知看看）。`base` 是 `codex`（权限由看看在 app-server 上设，不带 `--yolo`）。
+/// 还没有会话时开一个新的（app-server 会通知 Look）。`base` 是 `codex`（权限由 Look 在 app-server 上设，不带 `--yolo`）。
 /// 新开时要带 `--cd <工作目录>`：`--remote` 下不带的话，新对话的目录是 app-server 进程的目录，不是终端的。
 /// 目录用双引号括起来（PowerShell、bash 都认）；里面有引号、`$`、反引号时用 `.`（TUI 就在这个目录里启动）。
 pub fn tui_command(base: &str, ep: &Endpoint, thread: Option<&str>, cwd: &str) -> String {

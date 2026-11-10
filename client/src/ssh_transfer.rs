@@ -760,7 +760,7 @@ pub async fn remote_hosts(app: &App, from: &str) -> Result<Value, LocalError> {
     }
     let l = link(app, from).await?;
     match call::<Value>(&l, "/api/ssh/transfer/list", &json!({})).await {
-        // 旧版本的看看没有这个接口
+        // 旧版本的 Look 没有这个接口
         Err(e) if e.code == "NOT_FOUND" => Err(err("SSH_TRANSFER_UNSUPPORTED")),
         Err(e) => Err(e),
         Ok(v) => Ok(v.unwrap_or_default()),

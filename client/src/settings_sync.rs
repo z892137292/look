@@ -457,7 +457,7 @@ impl Syncer {
                         }
                     }
                     Ok(Err(e)) if e.status == axum::http::StatusCode::NOT_FOUND => {
-                        tracing::info!(%dev, "设置同步：那台电脑的看看版本太旧，这次运行期间不再找它");
+                        tracing::info!(%dev, "设置同步：那台电脑的 Look 版本太旧，这次运行期间不再找它");
                         lock(&self.old).insert(dev.clone());
                     }
                     Ok(Err(e)) => tracing::info!(%dev, code = %e.code, "设置同步：这次没同步上，稍后再试"),

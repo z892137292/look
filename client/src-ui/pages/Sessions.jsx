@@ -163,7 +163,7 @@ export function SessionUiProvider({ children }) {
     }
   };
   /**
-   * 接着以前的对话（History.jsx）：已经开在某个看看会话里的直接打开；否则新建一个会话接着它，
+   * 接着以前的对话（History.jsx）：已经开在某个 Look 会话里的直接打开；否则新建一个会话接着它，
    * 名字用对话标题，全部权限等选项用这个项目上次的。`fork` 为复制一份接着，原来的不动。
    */
   const continueConv = async (device, c, fork = false) => {

@@ -1,7 +1,7 @@
 // SSH 主机从另一台电脑导入（docs/SSH_TRANSFER.md）。
 // 新电脑：“从其他电脑导入”弹窗——选电脑 → 勾选主机、处理重名 → 显示 6 位确认码，等用户到旧电脑上输入 → 导入并逐台测试连接。
 // 旧电脑：顶部横幅提示有待确认的导出，确认框里列出来自哪台电脑、哪些主机、会带上什么，输入新电脑上显示的确认码才导出；
-// 打开“允许远程确认”后远程会话也能确认，另要邮箱验证码。秘密只在两台电脑的看看之间传，页面只看到进度和结果。
+// 打开“允许远程确认”后远程会话也能确认，另要邮箱验证码。秘密只在两台电脑的 Look 之间传，页面只看到进度和结果。
 import { ArrowDownToLine, Laptop, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';

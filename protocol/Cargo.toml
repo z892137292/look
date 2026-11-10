@@ -3,7 +3,7 @@ name = "looklook-protocol"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-description = "Looklook client <-> server shared protocol: signing, DTOs, error codes, gateway token, session capability, username rules"
+description = "Look client <-> server shared protocol: signing, DTOs, error codes, gateway token, session capability, username rules"
 
 [lib]
 name = "looklook_protocol"

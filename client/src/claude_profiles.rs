@@ -5,7 +5,7 @@
 //!
 //! 按 Anthropic 的规则来（docs/CLAUDE_ACCOUNTS.md）：
 //! - **官方账号**：每个账号一个 `CLAUDE_CONFIG_DIR`（官方文档“Log in with multiple accounts”的做法）。
-//!   登录、退出都由 Claude Code 自己完成（`claude auth login` / `claude auth logout`），看看不读、不存、不转发
+//!   登录、退出都由 Claude Code 自己完成（`claude auth login` / `claude auth logout`），Look 不读、不存、不转发
 //!   claude.ai 的令牌；账号状态只看 `claude auth status` 的输出（邮箱、套餐）。
 //!   本机默认账号就是 `~/.claude`（或用户自己设的 `CLAUDE_CONFIG_DIR`），启动时什么都不加。
 //!   另外的账号在 `<数据目录>/claude-accounts/<ID>/`：设置、CLAUDE.md、技能、插件、对话记录等用软链接共用默认目录的
@@ -34,7 +34,7 @@ const MAX_PROFILES: usize = 30;
 
 /// 另外的官方账号和默认目录共用的东西（默认目录里有的才链）。`.credentials.json`、`.claude.json` 不共用。
 const SHARED: &[&str] = &["settings.json", "CLAUDE.md", "keybindings.json", "agents", "commands", "skills", "plugins", "output-styles", "hooks", "projects"];
-/// 默认目录里没有时也先建好再链的：对话记录要在同一个地方，看看的对话界面、历史、接着以前的对话都靠它
+/// 默认目录里没有时也先建好再链的：对话记录要在同一个地方，Look 的对话界面、历史、接着以前的对话都靠它
 const SHARED_CREATE: &[&str] = &["projects"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -425,7 +425,7 @@ pub fn skip_first_run(home: &Path, p: &Profile, workdir: &Path) -> std::io::Resu
 
 /// Claude Code 改 `.claude.json` 时拿的锁：`<文件>.lock` 目录（它内置的 proper-lockfile，`mkdir` 成功就是拿到了）。
 /// 持有的进程每 5 秒刷新目录的修改时间，超过 10 秒没刷新算进程已经没了，删掉重来（跟 proper-lockfile 一样）。
-/// 看看只拿很短一会儿（读、改、写一次），不用刷新。
+/// Look 只拿很短一会儿（读、改、写一次），不用刷新。
 struct ConfigLock(PathBuf);
 
 impl ConfigLock {
@@ -571,7 +571,7 @@ fn seed_state(main: &Value) -> Value {
 fn sync_state(main_file: &Path, file: &Path) -> std::io::Result<()> {
     let main: Value = std::fs::read(main_file).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
     // Claude Code 自己在维护这个文件：拿它的锁（见 [`edit_locked`]），第一次（还是空的）时抄过来，
-    // 之后只补上没有的 MCP 服务器（例如后来装上的看看 MCP），别的不动
+    // 之后只补上没有的 MCP 服务器（例如后来装上的 Look MCP），别的不动
     edit_locked(file, |o| {
         if o.is_empty() {
             if let Value::Object(seed) = seed_state(&main) {
@@ -651,7 +651,7 @@ pub async fn status(shell: &str, home: &Path, p: &Profile) -> Value {
     }
 }
 
-/// 查官方账号的订阅用量：请 Claude Code 自己去取（`claude -p /usage`，不调用模型、不消耗额度），看看不拿令牌去问 Anthropic。
+/// 查官方账号的订阅用量：请 Claude Code 自己去取（`claude -p /usage`，不调用模型、不消耗额度），Look 不拿令牌去问 Anthropic。
 /// Claude Code 不把 HTTP 状态码交出来；登录失效（401）时它取不到用量，并且会清掉这个账号的凭据，
 /// 所以没取到时再问一次 `claude auth status`，以它为准：
 /// - `ok`：取到了，`limits` 同对话页（5 小时、7 天）
@@ -705,7 +705,7 @@ fn parse_status(stdout: &str) -> Value {
 //
 // 在后台运行 Claude Code 自己的 `claude auth login`：它没有终端时打印授权页地址，然后从标准输入读授权码。
 // 界面显示这个地址（用户自己打开、在 claude.com 上登录），把用户粘贴的授权码原样写给它；换令牌、保存令牌都是
-// Claude Code 自己做的。看看不保存、不记录授权码，也碰不到令牌。看看就在这台电脑上时，Claude Code 也可能自己
+// Claude Code 自己做的。Look 不保存、不记录授权码，也碰不到令牌。Look 就在这台电脑上时，Claude Code 也可能自己
 // 打开浏览器、走本机回调，不用粘贴就完成。
 
 /// 一次登录最长等多久（用户去浏览器里登录）
@@ -1270,7 +1270,7 @@ mod tests {
         let v: Value = serde_json::from_slice(&std::fs::read(&state).unwrap()).unwrap();
         let key = |d: &Path| std::fs::canonicalize(d).unwrap().display().to_string();
         println!("{}", serde_json::to_string_pretty(&v["projects"]).unwrap());
-        assert_eq!(v["projects"][key(&y)]["hasTrustDialogAccepted"], true, "看看写的还在");
+        assert_eq!(v["projects"][key(&y)]["hasTrustDialogAccepted"], true, "Look 写的还在");
         assert_eq!(v["projects"][key(&x)]["hasTrustDialogAccepted"], true);
         assert!(v["projects"][key(&x)].get("lastSessionId").is_some() || v.get("firstStartTime").is_some(), "Claude Code 写的也在");
         let _ = std::fs::remove_dir_all(&dir);

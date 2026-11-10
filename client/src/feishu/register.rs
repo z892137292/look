@@ -17,7 +17,7 @@ const FEISHU: &str = "https://accounts.feishu.cn";
 const LARK: &str = "https://accounts.larksuite.com";
 const ENDPOINT: &str = "/oauth/v1/app/registration";
 
-/// 看看要用的权限、事件、回调（设置页手动配置的列表跟这里一致）
+/// Look 要用的权限、事件、回调（设置页手动配置的列表跟这里一致）
 pub const SCOPES: &[&str] = &[
     "im:message:send_as_bot",
     "im:message.p2p_msg:readonly",
@@ -87,8 +87,8 @@ pub async fn begin(http: &reqwest::Client, app_id: Option<&str>, extra: &[&str],
     {
         let mut q = url.query_pairs_mut();
         q.append_pair("from", "sdk").append_pair("source", "looklook").append_pair("tp", "sdk");
-        q.append_pair("name", if en { "LookLook" } else { "看看" });
-        q.append_pair("desc", if en { "LookLook notifications and AI chat" } else { "看看的通知和 AI 对话" });
+        q.append_pair("name", if en { "Look" } else { "Look" });
+        q.append_pair("desc", if en { "Look notifications and AI chat" } else { "Look 的通知和 AI 对话" });
         q.append_pair("addons", &addons(extra));
         if let Some(id) = app_id {
             q.append_pair("clientID", id);

@@ -1,6 +1,6 @@
-// 看看客户端管理台。未登录时只显示登录页；登录后左侧栏（手机为抽屉）：用户菜单、新会话、工具（文件、SSH 主机、本机网页、
+// Look 客户端管理台。未登录时只显示登录页；登录后左侧栏（手机为抽屉）：用户菜单、新会话、工具（文件、SSH 主机、本机网页、
 // AI、系统、设置，可收成一行图标）、项目和会话。电脑上侧栏能整条收成图标栏。
-// 账户的事（电脑、会员与邀请、账户与安全）也在这里，放在用户菜单里，数据来自看看平台（shared/platform.js）。
+// 账户的事（电脑、会员与邀请、账户与安全）也在这里，放在用户菜单里，数据来自 Look 平台（shared/platform.js）。
 // 本机 App 和浏览器远程打开是同一个界面，差别只在顶栏的连接胶囊（ConnChip）。
 // 首页 / 是开始页（手机上是会话列表），/s/{id} 在右边打开会话；整页终端 /t/{id} 占满整个窗口（手机、新窗口）。
 // 界面不出现“ttyd、tmux、隧道、端口转发”等术语。
@@ -56,7 +56,7 @@ export function useStatus() {
   return useContext(StatusCtx);
 }
 
-/** 看看网页上的页面地址，例如续费、注册。 */
+/** Look 网页上的页面地址，例如续费、注册。 */
 export function webUrl(status, path) {
   return `${(status?.account?.server ?? '').replace(/\/$/, '')}${path}`;
 }
@@ -257,7 +257,7 @@ function GateBanner() {
   return null;
 }
 
-/** 用户卡片的菜单：电脑、会员与邀请、账户与安全；报告问题；看看主页、帮助文档、GitHub；退出登录。
+/** 用户卡片的菜单：电脑、会员与邀请、账户与安全；报告问题；Look 主页、帮助文档、GitHub；退出登录。
  *  外部链接在 App 里由系统浏览器打开（desktop.rs 拦截新窗口）。 */
 function useUserMenu() {
   const { t, i18n } = useTranslation();
@@ -296,7 +296,7 @@ function useUserMenu() {
   ];
 }
 
-/** 标签页标题前加上等你处理的个数：`(2) 看看`。每次重画都对一遍（对话页会临时在标题前加 ●，之后还原） */
+/** 标签页标题前加上等你处理的个数：`(2) Look`。每次重画都对一遍（对话页会临时在标题前加 ●，之后还原） */
 function useTitleCount() {
   const n = useAttnCount();
   useEffect(() => {

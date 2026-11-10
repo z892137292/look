@@ -335,7 +335,7 @@ impl Chat {
     /// 能在这个终端里用 app-server 了：终端里没有不接 app-server 的 Codex、app-server 起好了。
     /// 不加载这个终端现在的会话（换会话、新开会话用：现在的会话接不上也不妨碍换走）。
     async fn codex_ready(&self, id: &str) -> Result<Arc<AppServer>, LocalError> {
-        // 终端里跑着的 Codex 不是接在看看 app-server 上的：两边会同时写一个会话，现在不接；
+        // 终端里跑着的 Codex 不是接在 Look app-server 上的：两边会同时写一个会话，现在不接；
         // 在后台等它空闲时转到对话模式（接着同一段对话），转好后界面自己刷新
         match self.codex_terminal_kind(id).await {
             kind @ (TermCodex::Foreign | TermCodex::Local) => {
@@ -571,7 +571,7 @@ impl Chat {
         }
         let Some(inst) = self.codex_inst_of(p) else { return };
         // 认领来的对话第一轮写出记录了：让界面重新加载，重新加载时 codex_attach 会 resume 它，
-        // 之后逐条输出、审批才会推给看看（这里直接调 codex_attach 会让 async 的类型绕回自己）
+        // 之后逐条输出、审批才会推给 Look（这里直接调 codex_attach 会让 async 的类型绕回自己）
         if method == "thread/status/changed" {
             let gen = self.codex.generation.load(Ordering::SeqCst);
             let late = {
@@ -744,7 +744,7 @@ impl Chat {
         }
     }
 
-    /// app-server 要看看答复的请求：审批、提问挂起来等界面回答；其余不支持的答错误（Codex 按拒绝处理）。
+    /// app-server 要 Look 答复的请求：审批、提问挂起来等界面回答；其余不支持的答错误（Codex 按拒绝处理）。
     async fn codex_request(&self, rid: Value, method: &str, p: Value) {
         let Some(server) = self.codex.server.lock().await.clone() else { return };
         let inst = self.codex_inst_of(&p);
@@ -758,7 +758,7 @@ impl Chat {
             }
             "item/tool/requestUserInput" => ("AskUserQuestion", "question", questions_view(&p)),
             _ => {
-                let _ = server.respond_error(rid, &format!("{method} is not supported by Looklook")).await;
+                let _ = server.respond_error(rid, &format!("{method} is not supported by Look")).await;
                 return;
             }
         };
@@ -770,7 +770,7 @@ impl Chat {
         let guard = match p["command"].as_str().filter(|_| tool == "Bash").and_then(|c| crate::guard::check(&crate::guard::load(&self.store), c)) {
             Some(hit) if hit.action == crate::guard::Action::Deny => {
                 let _ = server.respond(rid, json!({ "decision": "decline" })).await;
-                self.codex_say_later(&inst.id, format!("A Looklook safety rule blocks that command ({}). Do not retry it or work around it; use another approach, or ask me to run it myself.", hit.rule));
+                self.codex_say_later(&inst.id, format!("A Look safety rule blocks that command ({}). Do not retry it or work around it; use another approach, or ask me to run it myself.", hit.rule));
                 return;
             }
             hit => hit.map(|h| h.rule),
@@ -1390,7 +1390,7 @@ impl Chat {
         }
     }
 
-    /// 不是看看开的对话开始了（终端里的 TUI 不带会话号启动后自己开的）：认领给在等它、同一个文件夹的终端；
+    /// 不是 Look 开的对话开始了（终端里的 TUI 不带会话号启动后自己开的）：认领给在等它、同一个文件夹的终端；
     /// 没登记过时，同一个文件夹里只有一个还没聊过的对话模式终端也算它的。对话页和终端从此是同一段。
     /// 认领了返回 true。
     fn codex_claim_thread(&self, p: &Value) -> bool {
@@ -1455,7 +1455,7 @@ impl Chat {
 
     /// 没人认领的新对话：多半是终端里接着 app-server 的 TUI 换了对话（`/new`、`/fork`）。
     /// 同一个文件夹里只有一个终端开着同步的 TUI、它这会儿空闲时，对话页跟过去，两边还是同一段。
-    /// 子代理、临时的对话不算；看看自己开的（`thread/start` 的结果比通知晚到）等一会儿再看是不是已经记下了。
+    /// 子代理、临时的对话不算；Look 自己开的（`thread/start` 的结果比通知晚到）等一会儿再看是不是已经记下了。
     /// 起名用的临时对话发来的通知：记下回答、答完通知等着的那边。是它的就返回 true（不再往下分给终端）。
     fn codex_title_note(&self, method: &str, p: &Value) -> bool {
         let Some(tid) = p["threadId"].as_str() else { return false };
@@ -1605,7 +1605,7 @@ impl Chat {
 
     // ---------------- 新版本 ----------------
 
-    /// Codex 有没有新版本：看看开的 TUI 不再自己提示（见 `codex_app::NO_UPDATE_PROMPT`），由这里查、在对话页提示。
+    /// Codex 有没有新版本：Look 开的 TUI 不再自己提示（见 `codex_app::NO_UPDATE_PROMPT`），由这里查、在对话页提示。
     /// 用 npm 装的可以一键更新（`npm install -g @openai/codex`，和新建会话时装 Codex 同一个任务）；别的装法只提示。
     /// 最新版本查 npm 镜像（和装的时候同一个源，国内能连上），[`UPDATE_TTL`] 内用上次的结果；跳过的版本不再提示。
     /// 没有新版本、查不到时为 null。
@@ -1713,7 +1713,7 @@ impl Chat {
 
     // ---------------- 以前的会话转到对话模式 ----------------
 
-    /// 终端里是旧版看看开的、用户自己开的、或者 app-server 用不了时改成本机直接运行的 Codex：在后台等它空闲
+    /// 终端里是旧版 Look 开的、用户自己开的、或者 app-server 用不了时改成本机直接运行的 Codex：在后台等它空闲
     /// （输入框空着、没在干活），退出它，用 app-server 接着它那段对话，终端里换成 `--remote` 的 TUI。
     /// 正在干活时每隔几秒再看，不打断；最多等 [`ADOPT_WAIT`]，之后下次打开对话页再试。
     pub(super) fn codex_adopt_later(self: Arc<Self>, id: &str) {
@@ -1771,7 +1771,7 @@ impl Chat {
     }
 
     /// 终端里那个 Codex 用的是哪段对话：命令行里带着（`codex resume <id>`）就用它；已经记着的就用记着的；
-    /// 旧版看看开的（`-p looklook-chat`，命令行里没有）按 [`super::guess_conversation`] 猜；猜不到（开着还没聊过）时
+    /// 旧版 Look 开的（`-p looklook-chat`，命令行里没有）按 [`super::guess_conversation`] 猜；猜不到（开着还没聊过）时
     /// 返回 None，转过去后开一段新的。
     async fn codex_foreign_thread(&self, id: &str, row: &crate::store::InstanceRow) -> Option<String> {
         let mut started_ms = 0;
@@ -1789,10 +1789,10 @@ impl Chat {
         super::guess_conversation(&self.store, id, &row.workdir, "codex", started_ms).await
     }
 
-    // ---------------- 不是看看打开的 Codex ----------------
+    // ---------------- 不是 Look 打开的 Codex ----------------
 
-    /// 终端里跑的是哪种 Codex：看看开的、接在 app-server 上的（`--remote`）；app-server 用不了时看看开的
-    /// 本机版（`--no-daemon resume <这个会话>`，不带旧版本的 `-p`）；别的都算不是看看开的
+    /// 终端里跑的是哪种 Codex：Look 开的、接在 app-server 上的（`--remote`）；app-server 用不了时 Look 开的
+    /// 本机版（`--no-daemon resume <这个会话>`，不带旧版本的 `-p`）；别的都算不是 Look 开的
     async fn codex_terminal_kind(&self, id: &str) -> TermCodex {
         let Some(pane) = self.instances.pane(id).await else { return TermCodex::None };
         let Some(args) = tokio::task::block_in_place(|| super::find_under(pane.pid, &["codex"])) else { return TermCodex::None };
@@ -1832,9 +1832,9 @@ impl Chat {
 /// 终端里跑着的 Codex
 enum TermCodex {
     None,
-    /// 看看开的、接在 app-server 上（和对话界面同步）
+    /// Look 开的、接在 app-server 上（和对话界面同步）
     Remote,
-    /// 看看开的、app-server 用不了时本机直接运行的（对话界面暂时不可用）
+    /// Look 开的、app-server 用不了时本机直接运行的（对话界面暂时不可用）
     Local,
     /// 别人开的（旧版本留下的、用户在终端里自己开的）
     Foreign,

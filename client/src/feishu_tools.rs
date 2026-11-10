@@ -110,8 +110,8 @@ fn fail(code: &str, message: impl Into<String>) -> Value {
 }
 
 fn configured(app: &App) -> Result<(Feishu, String), Value> {
-    let f = load_feishu(&app.store).ok_or_else(|| fail("FEISHU_NOT_CONFIGURED", "Feishu is not set up in Looklook. Ask the user to set it up in Looklook Settings → Notifications."))?;
-    let owner = f.open_id.clone().ok_or_else(|| fail("FEISHU_NOT_BOUND", "No Feishu account is bound in Looklook yet. Ask the user to finish the Feishu setup in Looklook Settings → Notifications."))?;
+    let f = load_feishu(&app.store).ok_or_else(|| fail("FEISHU_NOT_CONFIGURED", "Feishu is not set up in Look. Ask the user to set it up in Look Settings → Notifications."))?;
+    let owner = f.open_id.clone().ok_or_else(|| fail("FEISHU_NOT_BOUND", "No Feishu account is bound in Look yet. Ask the user to finish the Feishu setup in Look Settings → Notifications."))?;
     Ok((f, owner))
 }
 
@@ -864,7 +864,7 @@ mod tests {
 
     #[test]
     fn query_and_times() {
-        assert_eq!(with_query("/open-apis/im/v1/chats/search", &[("query", "看看 群"), ("page_token", "")]), "/open-apis/im/v1/chats/search?query=%E7%9C%8B%E7%9C%8B+%E7%BE%A4");
+        assert_eq!(with_query("/open-apis/im/v1/chats/search", &[("query", "Look 群"), ("page_token", "")]), "/open-apis/im/v1/chats/search?query=Look+%E7%BE%A4");
         assert_eq!(with_query("/a", &[("x", "")]), "/a");
         assert_eq!(seconds("2026-10-29T09:00:00+08:00").unwrap(), "1793235600");
         assert_eq!(seconds("1793235600000").unwrap(), "1793235600");

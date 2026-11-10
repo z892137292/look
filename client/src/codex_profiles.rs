@@ -6,7 +6,7 @@
 //!   `<数据目录>/model/codex-<ID>.key`（只有当前用户可读），不出现在任何进程的命令行参数里。
 //!   用 `-c` 临时定义服务商 `looklook-<ID>`，不改用户的 `~/.codex/config.toml`，也不会把 ChatGPT 登录凭据发给第三方。
 //! - **终端里直接起的 Codex**：这个配置的服务商定义 + `model_provider` + `model`，Key 由 shell 读进 `LOOKLOOK_MODEL_API_KEY`。
-//! - **对话模式**（看看起的一个 app-server 给所有会话用）：app-server 启动时把所有第三方配置都定义上，
+//! - **对话模式**（Look 起的一个 app-server 给所有会话用）：app-server 启动时把所有第三方配置都定义上，
 //!   每个的 Key 在自己的环境变量 `LOOKLOOK_CODEX_KEY_<ID>` 里；每个会话 `thread/start`、`thread/resume`、`thread/fork`
 //!   时传 `modelProvider`、`model`（app-server 协议支持按会话选，2026-10 用 0.164 实测）。
 //!   终端里接到 app-server 上的 TUI 也要定义同一个服务商并选上（TUI 自己先解析配置，不认识的服务商会报错）。

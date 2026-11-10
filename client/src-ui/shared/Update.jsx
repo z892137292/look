@@ -15,7 +15,7 @@ import { formatTime } from './time.js';
 import { Button, ErrorNote, Modal, Note, Switch, useAction, useToast } from './ui.jsx';
 
 const ACTIVE = ['downloading', 'installing', 'restarting'];
-/** 重启超过这么久还没换成新版本：提示刷新页面看看（可能新版本没能自己启动） */
+/** 重启超过这么久还没换成新版本：提示刷新页面 Look（可能新版本没能自己启动） */
 const SLOW_RESTART_MS = 60_000;
 
 /**
@@ -64,7 +64,7 @@ async function dismissVersion(version, toast, t) {
 }
 
 /**
- * 远程打开（看看网页、远程域名）或能切换电脑时，提醒说的是哪台电脑的看看：横幅前面带上它的名字。
+ * 远程打开（Look 网页、远程域名）或能切换电脑时，提醒说的是哪台电脑的 Look：横幅前面带上它的名字。
  * 在这台电脑上本机打开时不带（就是这台）。
  */
 function DeviceLabel() {

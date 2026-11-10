@@ -8,7 +8,7 @@
 //!
 //! 工具：`list_mappings`、`find_mapping`（只查）、`ensure_mapping`（有就复用并启用，没有就创建）；
 //! `list_ssh_hosts`、`ssh_run`：在用户标了“允许 AI 使用”的 SSH 主机上运行命令（ssh.rs）。AI 只给出主机名，
-//! 登录用的密码 / 私钥由看看在本机提供，不经过 AI；返回的输出去掉已存密码、私钥块和常见令牌。
+//! 登录用的密码 / 私钥由 Look 在本机提供，不经过 AI；返回的输出去掉已存密码、私钥块和常见令牌。
 //! 返回里附带端口探测结果：本机网页只转发到 127.0.0.1，开发服务器只监听 `::1` 时要提醒改监听地址。
 //! `feishu_*`：以你本人的身份读群聊和单聊、下载文件、找人、读云文档、发消息（发之前在飞书里问你），见 feishu_tools.rs。
 
@@ -91,7 +91,7 @@ pub async fn handle(State(app): State<App>, access: Option<Extension<Access>>, p
         .map(str::trim)
         .unwrap_or("");
     if !cfg.token_matches(bearer) {
-        let why = if cfg.enabled { "invalid MCP token; reinstall Looklook MCP from the Looklook console (Local pages → AI assistants)" } else { "Looklook MCP is turned off; turn it on in the Looklook console (Local pages → AI assistants)" };
+        let why = if cfg.enabled { "invalid MCP token; reinstall Look MCP from the Look console (Local pages → AI assistants)" } else { "Look MCP is turned off; turn it on in the Look console (Local pages → AI assistants)" };
         return (StatusCode::UNAUTHORIZED, Json(json!({ "error": why }))).into_response();
     }
     let msg: Value = match serde_json::from_slice(&body) {
@@ -143,7 +143,7 @@ async fn dispatch(app: &App, msg: Value) -> Option<Value> {
             json!({
                 "protocolVersion": version,
                 "capabilities": { "tools": { "listChanged": false } },
-                "serverInfo": { "name": SERVER_NAME, "title": "Looklook local pages", "version": VERSION },
+                "serverInfo": { "name": SERVER_NAME, "title": "Look local pages", "version": VERSION },
                 "instructions": if feishu_on(app, &McpConfig::load(&app.store)) { format!("{INSTRUCTIONS}{}", crate::feishu_tools::INSTRUCTIONS) } else { INSTRUCTIONS.to_string() },
             })
         }
@@ -171,12 +171,12 @@ fn tool_result(v: Value, is_error: bool) -> Value {
     json!({ "content": [{ "type": "text", "text": text }], "structuredContent": v, "isError": is_error })
 }
 
-const INSTRUCTIONS: &str = "Looklook publishes web pages running on this computer (e.g. a dev server on localhost:5173) at the user's private Looklook address, \
+const INSTRUCTIONS: &str = "Look publishes web pages running on this computer (e.g. a dev server on localhost:5173) at the user's private Look address, \
 so they can open them from a phone or another computer. Only the signed-in owner can open these addresses. \
 Use find_mapping to check whether a port already has an address, ensure_mapping to create one or reuse the existing one, list_mappings to see all. \
-Each port has at most one mapping; the account has a small limit (usually 10). Looklook forwards to 127.0.0.1 only. \
-If list_ssh_hosts and ssh_run are available, you may also run commands on SSH servers the user saved in Looklook and allowed for AI; \
-Looklook logs in for you, so never ask for passwords or keys. Some hosts run Windows (cmd or PowerShell), not a POSIX shell.";
+Each port has at most one mapping; the account has a small limit (usually 10). Look forwards to 127.0.0.1 only. \
+If list_ssh_hosts and ssh_run are available, you may also run commands on SSH servers the user saved in Look and allowed for AI; \
+Look logs in for you, so never ask for passwords or keys. Some hosts run Windows (cmd or PowerShell), not a POSIX shell.";
 
 /// SSH 工具的名字（总开关关掉时从工具列表里拿掉）
 const SSH_TOOLS: [&str; 2] = ["list_ssh_hosts", "ssh_run"];
@@ -213,26 +213,26 @@ fn all_tool_defs() -> Value {
         {
             "name": "list_mappings",
             "title": "List local page mappings",
-            "description": "List every local port already published through Looklook, with its public URL and whether it is enabled.",
+            "description": "List every local port already published through Look, with its public URL and whether it is enabled.",
             "inputSchema": { "type": "object", "properties": {} },
             "annotations": { "readOnlyHint": true },
         },
         {
             "name": "find_mapping",
             "title": "Find the mapping for a port",
-            "description": "Check whether a local port already has a Looklook address. Never creates anything. Returns `mapping` (null if none) and `local` (whether the port currently answers HTTP on 127.0.0.1).",
+            "description": "Check whether a local port already has a Look address. Never creates anything. Returns `mapping` (null if none) and `local` (whether the port currently answers HTTP on 127.0.0.1).",
             "inputSchema": { "type": "object", "properties": { "port": port }, "required": ["port"] },
             "annotations": { "readOnlyHint": true },
         },
         {
             "name": "ensure_mapping",
             "title": "Create or reuse a mapping",
-            "description": "Publish a local HTTP port at the user's Looklook address. If the port is already mapped, the existing mapping is reused (and re-enabled if it was disabled) instead of creating a duplicate. Returns the access URL.",
+            "description": "Publish a local HTTP port at the user's Look address. If the port is already mapped, the existing mapping is reused (and re-enabled if it was disabled) instead of creating a duplicate. Returns the access URL.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "port": port,
-                    "name": { "type": "string", "maxLength": 32, "description": "Short label shown in the Looklook console, e.g. the project name. Defaults to localhost:<port>. Ignored when reusing." }
+                    "name": { "type": "string", "maxLength": 32, "description": "Short label shown in the Look console, e.g. the project name. Defaults to localhost:<port>. Ignored when reusing." }
                 },
                 "required": ["port"]
             },
@@ -241,14 +241,14 @@ fn all_tool_defs() -> Value {
         {
             "name": "list_ssh_hosts",
             "title": "List SSH hosts you may use",
-            "description": "List the SSH servers the user saved in Looklook and allowed AI assistants to use. Only names and user@host:port are returned — never passwords or keys.",
+            "description": "List the SSH servers the user saved in Look and allowed AI assistants to use. Only names and user@host:port are returned — never passwords or keys.",
             "inputSchema": { "type": "object", "properties": {} },
             "annotations": { "readOnlyHint": true },
         },
         {
             "name": "ssh_run",
             "title": "Run a command on an SSH host",
-            "description": "Run one non-interactive shell command on a saved SSH host (by name from list_ssh_hosts) and return exit_code, stdout and stderr (each capped at 64 KB). Looklook logs in with the user's stored credentials; you never see or need them. Known secrets, private keys and common tokens are redacted from the output. Commands that wait for input will time out.",
+            "description": "Run one non-interactive shell command on a saved SSH host (by name from list_ssh_hosts) and return exit_code, stdout and stderr (each capped at 64 KB). Look logs in with the user's stored credentials; you never see or need them. Known secrets, private keys and common tokens are redacted from the output. Commands that wait for input will time out.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -279,19 +279,19 @@ impl From<LocalError> for ToolError {
 /// 给 AI 助手看的错误说明（它会转述给用户）
 fn explain(code: &str) -> &'static str {
     match code {
-        "NOT_LOGGED_IN" => "Opening local pages from outside is part of Looklook remote access, which needs a Looklook account (new accounts get their first year free). Tell the user they can turn it on from the Looklook console; everything else keeps working without signing in.",
-        "LOCKED" => "Looklook remote access is paused (membership expired, account disabled, or offline too long). Tell the user they can extend their membership in the Looklook console (Membership: redeem a renewal code or invite friends). Everything on this computer keeps working.",
-        "NETWORK" => "Looklook cannot reach its server right now. Try again later.",
-        "PORT_RESERVED" => "This port belongs to Looklook itself and cannot be published.",
-        "TUNNEL_LIMIT_REACHED" => "The account already has the maximum number of mappings. Ask the user which one to delete in the Looklook console (Local pages).",
+        "NOT_LOGGED_IN" => "Opening local pages from outside is part of Look remote access, which needs a Look account (new accounts get their first year free). Tell the user they can turn it on from the Look console; everything else keeps working without signing in.",
+        "LOCKED" => "Look remote access is paused (membership expired, account disabled, or offline too long). Tell the user they can extend their membership in the Look console (Membership: redeem a renewal code or invite friends). Everything on this computer keeps working.",
+        "NETWORK" => "Look cannot reach its server right now. Try again later.",
+        "PORT_RESERVED" => "This port belongs to Look itself and cannot be published.",
+        "TUNNEL_LIMIT_REACHED" => "The account already has the maximum number of mappings. Ask the user which one to delete in the Look console (Local pages).",
         "TUNNEL_PORT_INVALID" => "The port must be between 1 and 65535.",
         "VALIDATION_FAILED" => "The name is invalid (1-32 characters, no control characters).",
-        "SSH_AI_DISABLED" => "The user has turned off SSH access for AI assistants in the Looklook console (AI assistants page). Do not retry; tell the user if they need it.",
-        "SSH_HOST_NOT_ALLOWED" => "No SSH host with that name is available to AI assistants. Call list_ssh_hosts; the user can allow more hosts in the Looklook console (SSH hosts).",
+        "SSH_AI_DISABLED" => "The user has turned off SSH access for AI assistants in the Look console (AI assistants page). Do not retry; tell the user if they need it.",
+        "SSH_HOST_NOT_ALLOWED" => "No SSH host with that name is available to AI assistants. Call list_ssh_hosts; the user can allow more hosts in the Look console (SSH hosts).",
         "SSH_MISSING" => "The OpenSSH client (ssh) is not installed on this computer.",
-        "SSH_FAILED" => "Looklook could not start the SSH connection.",
-        "FEISHU_AI_DISABLED" => "The user has turned off Feishu tools for AI assistants in the Looklook console (AI assistants page). Do not retry; tell the user if they need it.",
-        _ => "The Looklook operation failed.",
+        "SSH_FAILED" => "Look could not start the SSH connection.",
+        "FEISHU_AI_DISABLED" => "The user has turned off Feishu tools for AI assistants in the Look console (AI assistants page). Do not retry; tell the user if they need it.",
+        _ => "The Look operation failed.",
     }
 }
 
@@ -329,7 +329,7 @@ async fn call_tool(app: &App, name: &str, args: &Value) -> Result<Value, ToolErr
             let all = crate::ssh::list(&app.store);
             let via = |h: &crate::ssh::SshHost| all.iter().find(|j| j.id == h.jump).map(|j| j.name.clone());
             let hosts: Vec<Value> = all.iter().filter(|h| h.allow_ai).map(|h| json!({ "name": h.name, "target": format!("{}@{}:{}", h.user, h.host, h.port), "via": via(h) })).collect();
-            Ok(json!({ "hosts": hosts, "note": "Use ssh_run with a host name. Credentials are supplied by Looklook and are never shown to you; do not ask the user for passwords or keys." }))
+            Ok(json!({ "hosts": hosts, "note": "Use ssh_run with a host name. Credentials are supplied by Look and are never shown to you; do not ask the user for passwords or keys." }))
         }
         "ssh_run" => {
             let name = args.get("host").and_then(Value::as_str).unwrap_or_default();
@@ -404,9 +404,9 @@ async fn probe(port: u16) -> Value {
         },
     };
     let hint = match state {
-        "ipv6_only" => Some("The server listens on [::1] only, but Looklook forwards to 127.0.0.1. Restart it bound to 127.0.0.1 (e.g. `vite --host 127.0.0.1`)."),
+        "ipv6_only" => Some("The server listens on [::1] only, but Look forwards to 127.0.0.1. Restart it bound to 127.0.0.1 (e.g. `vite --host 127.0.0.1`)."),
         "closed" => Some("Nothing is listening on this port yet; the address works once the server starts."),
-        "not_http" => Some("Something is listening but did not answer HTTP; Looklook only publishes HTTP servers."),
+        "not_http" => Some("Something is listening but did not answer HTTP; Look only publishes HTTP servers."),
         _ => None,
     };
     json!({ "state": state, "hint": hint })

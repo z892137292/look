@@ -1,8 +1,8 @@
-// 看看（Looklook）的 DSH 插件：把这个 DSH 网页界面的带口令地址写到本文件旁边的 `web-{pid}.json`，
-// 看看用它登录正在运行的 DSH（不管是谁启动的、在哪个端口上），远程经看看的通道打开。
+// Look 的 DSH 插件：把这个 DSH 网页界面的带口令地址写到本文件旁边的 `web-{pid}.json`，
+// Look 用它登录正在运行的 DSH（不管是谁启动的、在哪个端口上），远程经 Look 的通道打开。
 //
-// 由看看自动安装（见 looklook-client/src/agents.rs 的 “DSH 网页界面插件”），放在 `$DSH_HOME/looklook/`，
-// home 层补丁 `$DSH_HOME/cordis.patch.yml` 里看看那一段引用它。地址用官方的 `connection.authenticatedUrl()`
+// 由 Look 自动安装（见 looklook-client/src/agents.rs 的 “DSH 网页界面插件”），放在 `$DSH_HOME/looklook/`，
+// home 层补丁 `$DSH_HOME/cordis.patch.yml` 里 Look 那一段引用它。地址用官方的 `connection.authenticatedUrl()`
 // 取得（`dsh web` 打印 “dsh web: …” 那一行用的也是它），不读签名密钥，也不自己做 Cookie。
 // 没有网页界面的 profile（headless、sdk 等）里什么也不做；不打印任何东西。
 import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
@@ -27,7 +27,7 @@ export function apply(ctx) {
         writeFileSync(tmp, JSON.stringify({ v: 1, pid: process.pid, port, url, at: Date.now() }), { mode: 0o600 });
         renameSync(tmp, file);
       } catch {
-        // 写不了就算了：看看会退回读自己启动的 dsh 的输出
+        // 写不了就算了：Look 会退回读自己启动的 dsh 的输出
       }
     };
     // 和 dsh-web-app 打印地址的时机一样：插件全部加载完、开始监听之后

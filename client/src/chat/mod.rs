@@ -8,7 +8,7 @@
 //!
 //! 审批时 TUI 也同时弹出了自己的确认框，两边谁先回答算谁的（实测）；任何异常都交给 TUI，不会自动放行。
 //!
-//! Codex 不走这一套（docs/CODEX_UI.md）：对话模式的 Codex 由看看通过 `codex app-server` 驱动（`codex_chat.rs`），
+//! Codex 不走这一套（docs/CODEX_UI.md）：对话模式的 Codex 由 Look 通过 `codex app-server` 驱动（`codex_chat.rs`），
 //! 不跑 TUI、没有 hooks。快照、事件推送、读记录文件（rollout）和审批挂起两边共用；任务面板、后台命令只有 Claude Code 有。
 
 pub mod agent;
@@ -171,7 +171,7 @@ struct State {
     queued: Vec<String>,
     /// 额度用完、正在等重置后自动继续：屏幕上 `continuing automatically at 3pm` 里的 `at 3pm`
     limit_wait: Option<String>,
-    /// 额度用完的菜单没人选时，看看在这个时间（毫秒）替用户选“等重置后自动继续”
+    /// 额度用完的菜单没人选时，Look 在这个时间（毫秒）替用户选“等重置后自动继续”
     limit_auto_at: Option<i64>,
     /// TUI 上的选择框（phase 为 tui 时）
     dialog: Option<screen::Dialog>,
@@ -755,7 +755,7 @@ impl Chat {
     /// 没人确认（超时、这一轮停了、被别的审批顶掉）就拒绝：PreToolUse 不做决定 Claude Code 会照常执行。
     async fn guard_request(&self, inst: &Arc<Inst>, hit: crate::guard::Hit, ev: &Value) -> String {
         if hit.action == crate::guard::Action::Deny {
-            return pre_tool_use("deny", &format!("A Looklook safety rule blocks this command ({}). Do not retry it or work around it; use another approach, or ask the user to run it themselves.", hit.rule));
+            return pre_tool_use("deny", &format!("A Look safety rule blocks this command ({}). Do not retry it or work around it; use another approach, or ask the user to run it themselves.", hit.rule));
         }
         let (tx, rx) = oneshot::channel();
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
@@ -775,7 +775,7 @@ impl Chat {
             Self::set_phase(inst, &mut st, Phase::Running, None);
         }
         if out.is_empty() {
-            return pre_tool_use("deny", &format!("This command matches a Looklook safety rule ({}) and nobody confirmed it in time, so it was not run. Ask the user before trying again.", hit.rule));
+            return pre_tool_use("deny", &format!("This command matches a Look safety rule ({}) and nobody confirmed it in time, so it was not run. Ask the user before trying again.", hit.rule));
         }
         out
     }
@@ -858,7 +858,7 @@ impl Chat {
             if let Err(e) = self.codex_attach(id).await {
                 let mut st = lock(&inst.st);
                 if e.code == "CHAT_FOREIGN" {
-                    // 不是看看打开的：界面上说明，不算出错
+                    // 不是 Look 打开的：界面上说明，不算出错
                     Self::set_phase(&inst, &mut st, Phase::Detached, Some("not_attached"));
                 } else if e.code == "CHAT_TERMINAL_ONLY" {
                     // 后台连不上时终端在本机直接跑：说明对话暂时不可用，终端照常能用
@@ -965,7 +965,7 @@ impl Chat {
             Some(_) => self.instances.screen(&inst.id).await,
             None => None,
         };
-        // 在运行、但不是带着看看的 hooks 启动的（开启对话界面之前就开着的、在终端里手动开的）
+        // 在运行、但不是带着 Look 的 hooks 启动的（开启对话界面之前就开着的、在终端里手动开的）
         let unhooked = running == Some(Some(false));
         let screen = capture.as_deref().map(|c| inst.agent.classify(c));
         let mut st = lock(&inst.st);
@@ -1024,7 +1024,7 @@ impl Chat {
                     }
                     (_, Screen::Input { busy, ref text }) if !attached => {
                         Self::set_phase(inst, &mut st, Phase::Detached, Some("not_attached"));
-                        // 以前的 Claude（不是带着看看的 hooks 启动的）空闲着：接着同一段对话转到对话模式
+                        // 以前的 Claude（不是带着 Look 的 hooks 启动的）空闲着：接着同一段对话转到对话模式
                         adopt = unhooked && !busy && text.trim().is_empty() && inst.agent.launch() == "claude";
                     }
                     // 压缩中（最多算 10 分钟，防止丢了 PostCompact 一直卡着）
@@ -1530,10 +1530,10 @@ impl Chat {
         }
         if p.guard.is_some() {
             let out = match req.decision.as_str() {
-                "allow" => pre_tool_use("allow", "The user confirmed this command in Looklook."),
+                "allow" => pre_tool_use("allow", "The user confirmed this command in Look."),
                 "deny" => {
                     let why = req.message.as_deref().map(str::trim).filter(|m| !m.is_empty());
-                    pre_tool_use("deny", &format!("The user declined this command in Looklook.{}", why.map(|m| format!(" Their note: {m}")).unwrap_or_default()))
+                    pre_tool_use("deny", &format!("The user declined this command in Look.{}", why.map(|m| format!(" Their note: {m}")).unwrap_or_default()))
                 }
                 _ => return Err(LocalError::invalid("decision", "invalid")),
             };
@@ -1613,7 +1613,7 @@ impl Chat {
         self.claude_adopt(id, true).await
     }
 
-    /// 以前的 Claude Code（不是带着看看的 hooks 启动的）空闲时：后台转到对话模式。同一个终端同时只跑一个。
+    /// 以前的 Claude Code（不是带着 Look 的 hooks 启动的）空闲时：后台转到对话模式。同一个终端同时只跑一个。
     fn claude_adopt_later(self: Arc<Self>, id: &str) {
         if !lock(&self.codex.adopting).insert(id.to_string()) {
             return;
@@ -1716,7 +1716,7 @@ impl Chat {
         Ok(())
     }
 
-    /// 这个会话能换账号：Claude Code、不在容器里（容器里的不用看看的账号，model_wrap）
+    /// 这个会话能换账号：Claude Code、不在容器里（容器里的不用 Look 的账号，model_wrap）
     fn profile_switchable(&self, id: &str) -> Result<bool, LocalError> {
         let row = self.store.instance(id)?.ok_or_else(LocalError::not_found)?;
         Ok(row.launch == "claude" && self.instances.container(id).is_none())
@@ -1899,7 +1899,7 @@ impl Chat {
         let workdir = PathBuf::from(&row.workdir);
         let ctx = self.model_ctx(id, &workdir).await;
         let mut options = tokio::task::block_in_place(|| models::options(&ctx));
-        // 第三方接口：claude 进程环境里的地址（看看配置的接口也是这样传进去的）；读不到进程环境时用这个会话的配置
+        // 第三方接口：claude 进程环境里的地址（Look 配置的接口也是这样传进去的）；读不到进程环境时用这个会话的配置
         let profile = crate::claude_profiles::for_instance(&self.store, id);
         let ours = profile.base_url.as_ref().filter(|_| crate::claude_profiles::launch_env(&self.paths.home, &profile).is_some());
         let base = ctx.env.get("ANTHROPIC_BASE_URL").cloned().or_else(|| ours.cloned());
@@ -2514,7 +2514,7 @@ fn valid_transcript_path(p: &Path) -> bool {
         && !p.components().any(|c| matches!(c, std::path::Component::ParentDir))
 }
 
-/// 面板里的 AI 工具：没在运行时 None；在运行时 `Some(是不是带着看看的 hooks 启动的)`，看不出来为 `Some(None)`。
+/// 面板里的 AI 工具：没在运行时 None；在运行时 `Some(是不是带着 Look 的 hooks 启动的)`，看不出来为 `Some(None)`。
 ///
 /// 一般看前台命令是不是 shell 就行；psmux（Windows）报的是最近启动的子进程，Codex 跑命令、跑 hook 时
 /// 会报成 `powershell`，所以有进程名的工具（[`Agent::process_names`]）再看面板进程底下有没有它，顺便看它的命令行参数。
@@ -2560,7 +2560,7 @@ fn proc_under(root: u32, names: &[&str]) -> Option<(Vec<String>, i64)> {
     Some((p.cmd().iter().map(|a| a.to_string_lossy().into_owned()).collect(), p.start_time() as i64 * 1000))
 }
 
-/// 终端里以前的那个 Claude Code / Codex 用的是哪段对话（命令行里没有会话号、看看也没记着时）：这个文件夹里
+/// 终端里以前的那个 Claude Code / Codex 用的是哪段对话（命令行里没有会话号、Look 也没记着时）：这个文件夹里
 /// 没被别的终端接着的对话中，正在写的、或者在它启动之后还更新过的，取最近的一段。都没有说明它开着还没聊过，返回 None。
 async fn guess_conversation(store: &crate::store::Store, id: &str, workdir: &str, agent: &str, started_ms: i64) -> Option<String> {
     let taken: HashSet<String> = store.instances().ok()?.iter().filter(|r| r.id != id).filter_map(|r| binding(store, &r.id)).map(|b| b.session_id).collect();
@@ -3086,7 +3086,7 @@ mod tests {
         let key = std::fs::canonicalize(&dir).unwrap().display().to_string();
         assert_eq!(state["projects"][&key]["hasTrustDialogAccepted"], true, "{}", state["projects"]);
         assert_eq!(state["theme"], "auto");
-        // 看看不写用户设置（Bypass 警告靠 `--settings` 传的 skipDangerousModePermissionPrompt）；
+        // Look 不写用户设置（Bypass 警告靠 `--settings` 传的 skipDangerousModePermissionPrompt）；
         // 用户设置里没选过主题时，Claude Code 启动时自己把 `.claude.json` 里的 `theme` 迁过去
         let settings: Value = std::fs::read(cfg.path().join("settings.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
         assert!(settings.get("skipDangerousModePermissionPrompt").is_none(), "{settings}");
@@ -3541,7 +3541,7 @@ mod tests {
         println!("压缩中看到 compacting：{seen}；条目 {}", s["items"].as_array().unwrap().len());
         drop(viewer);
         instances.stop(&id).await.ok();
-        // app-server 是单独的进程组（看看重启时留着接着用），测试完要自己结束
+        // app-server 是单独的进程组（Look 重启时留着接着用），测试完要自己结束
         let server = chat.codex.server.lock().await.take();
         if let Some(server) = server {
             server.kill();

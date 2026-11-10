@@ -1,12 +1,12 @@
 #!/bin/bash
-# Looklook + 节点（mihomo 全局代理）安装：在解压后的安装包里以 root 运行（install.sh 会自动调用）。
+# Look + 节点（mihomo 全局代理）安装：在解压后的安装包里以 root 运行（install.sh 会自动调用）。
 #
 #   sudo bash setup.sh [--user 名字] [--kill-switch] [--force] [--no-looklook]
 #
 # 装好后：
 #   - lk-mihomo.service：mihomo（lk-mihomo 用户 + TUN），全局代理，局域网直连
-#   - lk-nodes.service ：root 小服务 127.0.0.1:9091，Looklook「节点」页经它加节点、加订阅
-#   - Looklook 装给 --user（默认是执行 sudo 的那个用户），浏览器打开 http://<IP>:1234/nodes
+#   - lk-nodes.service ：root 小服务 127.0.0.1:9091，Look「节点」页经它加节点、加订阅
+#   - Look 装给 --user（默认是执行 sudo 的那个用户），浏览器打开 http://<IP>:1234/nodes
 # 节点密码只在这里设置（终端输入），网页上改不了。
 set -euo pipefail
 
@@ -50,7 +50,7 @@ if [ -n "$need" ]; then
   fi
 fi
 if [ $LOOKLOOK = 1 ]; then
-  [ -n "$TARGET" ] && [ "$TARGET" != root ] || die "Looklook 要装给一个普通用户：用那个用户执行 sudo，或加 --user 名字"
+  [ -n "$TARGET" ] && [ "$TARGET" != root ] || die "Look 要装给一个普通用户：用那个用户执行 sudo，或加 --user 名字"
   id "$TARGET" >/dev/null 2>&1 || die "没有用户 $TARGET"
 fi
 if [ $FORCE = 0 ] && ! systemctl is-active -q $SVC 2>/dev/null; then
@@ -94,7 +94,7 @@ $LIB/lk-nodes-helper render
 
 cat >/etc/systemd/system/$SVC.service <<EOF
 [Unit]
-Description=mihomo 全局代理（Looklook 节点）
+Description=mihomo 全局代理（Look 节点）
 After=network-online.target
 Wants=network-online.target
 
@@ -117,7 +117,7 @@ WantedBy=multi-user.target
 EOF
 cat >/etc/systemd/system/lk-nodes.service <<EOF
 [Unit]
-Description=Looklook 节点小服务（127.0.0.1:9091）
+Description=Look 节点小服务（127.0.0.1:9091）
 After=$SVC.service
 
 [Service]
@@ -156,19 +156,19 @@ if [ $TTY = 1 ] && [ -n "${SSH_CONNECTION:-}" ]; then
   fi
 fi
 
-# ---------- Looklook ----------
+# ---------- Look ----------
 if [ $LOOKLOOK = 1 ]; then
-  say "[4/5] 安装 Looklook（用户 $TARGET）"
+  say "[4/5] 安装 Look（用户 $TARGET）"
   uid=$(id -u "$TARGET")
   loginctl enable-linger "$TARGET"
   systemctl start "user@$uid.service"
-  # 在 Looklook 自带的安装程序里装成该用户的 systemd 用户服务
+  # 在 Look 自带的安装程序里装成该用户的 systemd 用户服务
   tmp=$(mktemp -d)
   cp -R "$SRC/../looklook" "$tmp/"
   chown -R "$TARGET": "$tmp"
   runuser -u "$TARGET" -- env HOME="$(getent passwd "$TARGET" | cut -d: -f6)" XDG_RUNTIME_DIR=/run/user/$uid \
     DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus sh "$tmp/looklook/install.sh" >/tmp/lk-install-looklook.log 2>&1 \
-    || { cat /tmp/lk-install-looklook.log; rm -rf "$tmp"; die "Looklook 安装失败"; }
+    || { cat /tmp/lk-install-looklook.log; rm -rf "$tmp"; die "Look 安装失败"; }
   rm -rf "$tmp"
 fi
 

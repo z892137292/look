@@ -178,7 +178,7 @@ pub(super) async fn login(app: &App, id: &str) -> Result<Option<DshLogin>, crate
         step(id, "token", "ok", Some("由 DSH 进程给出".into()));
         step(id, "login", "ok", None);
         if v.web_port != Some(l.port) {
-            // 以后由看看启动时也用这个端口
+            // 以后由 Look 启动时也用这个端口
             app.instances.set_web_port(id, l.port)?;
         }
         remember(id, &l);
@@ -412,7 +412,7 @@ mod tests {
     static DSH_ENV: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
     /// 端到端，要真的 dsh：`LOOKLOOK_TEST_DSH=/path/to/dsh cargo test -- --ignored reuses_running_dsh`。
-    /// 先运行一个“用户自己的” DSH（看看的插件还没装），再经网关打开 `/w/{id}/`：装上插件、DSH 热加载后用上它，
+    /// 先运行一个“用户自己的” DSH（Look 的插件还没装），再经网关打开 `/w/{id}/`：装上插件、DSH 热加载后用上它，
     /// 不另起一个；用户换个端口重新运行后，再打开也能接上。
     #[tokio::test]
     #[ignore]

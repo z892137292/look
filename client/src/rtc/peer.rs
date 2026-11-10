@@ -724,7 +724,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn connects_through_the_public_candidate_alone() {
         let strip = |sdp: &str| sdp.split_inclusive('\n').filter(|l| !l.contains(" typ host")).collect::<String>();
-        // 不用默认范围（50000-50031）：本机正在运行的看看占着那些端口时这里会失败
+        // 不用默认范围（50000-50031）：本机正在运行的 Look 占着那些端口时这里会失败
         let net = NetConfig { port_begin: 50140, port_end: 50147, public_v4: Some("127.0.0.1".into()), ..NetConfig::DEFAULT };
         let (mut a, mut ctl) = Pc::offer_in(&[], &net, true).unwrap();
         let offer = strip(&a.local_offer(Duration::from_secs(3)).await.unwrap());
@@ -740,7 +740,7 @@ mod tests {
     }
 
     /// libjuice / libdatachannel 建的 socket、pipe 都不让子进程继承（third_party 的补丁）：
-    /// 否则看看起的终端、tmux 一直占着 UDP 端口，端口范围被占满
+    /// 否则 Look 起的终端、tmux 一直占着 UDP 端口，端口范围被占满
     #[cfg(target_os = "linux")]
     #[tokio::test]
     async fn sockets_are_not_inherited() {

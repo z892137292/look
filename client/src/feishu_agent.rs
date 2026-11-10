@@ -400,7 +400,7 @@ fn failed(en: bool, e: &LocalError) -> String {
 }
 
 fn off_hint(en: bool) -> String {
-    tr(en, "在飞书里和 AI 对话没有打开：到看看的设置 → 通知里打开。", "Chatting with the AI in Feishu is off. Turn it on in LookLook Settings → Notifications.")
+    tr(en, "在飞书里和 AI 对话没有打开：到 Look 的设置 → 通知里打开。", "Chatting with the AI in Feishu is off. Turn it on in Look Settings → Notifications.")
 }
 
 /// 去掉“正在输入”表情
@@ -445,7 +445,7 @@ pub(crate) async fn grant(app: &App, api: &Api, why: &str, extra: &[&str]) -> Op
         "cardkit" => tr(en, "边写边出的回复卡片要开通“创建与更新卡片”。会话已经在电脑上跑了。", "Streaming reply cards need the card-update scope. The session is already running on your computer."),
         "group" => tr(en, "建项目群要开通“创建群”。", "Creating project groups needs the create-group scope."),
         "user" => tr(en, "AI 助手用你的身份读消息、发消息、读云文档，要给应用开通这些用户权限。开通后 AI 助手下次用到时会请你授权。", "For AI assistants to read and send messages and read docs as you, the app needs these user scopes. After that you'll be asked to authorize."),
-        _ => tr(en, "看看用到的功能缺少权限。", "A feature LookLook uses is missing a scope."),
+        _ => tr(en, "Look 用到的功能缺少权限。", "A feature Look uses is missing a scope."),
     };
     let msg = match api.send_card(&to, &card::grant(en, &text, &reg.url)).await {
         Ok(m) => m,
@@ -755,7 +755,7 @@ async fn create_project(app: &App, api: &Api, id: &str, chat: &str, name: &str, 
     let folder = folder_name(&dir);
     let device = dev_name(app, &dev).await;
     let agent_name = if agent == "codex" { "Codex" } else { "Claude" };
-    let title = if name.is_empty() { format!("{} · {folder}", tr(en, "看看", "LookLook")) } else { name.to_string() };
+    let title = if name.is_empty() { format!("{} · {folder}", tr(en, "Look", "Look")) } else { name.to_string() };
     let desc = tr(en, &format!("{folder} · {device} · {agent_name}"), &format!("{folder} · {device} · {agent_name}"));
     let group = match api.create_group(&title, &desc, operator).await {
         Ok(g) => g,
@@ -1765,10 +1765,10 @@ mod tests {
     #[test]
     fn text_from_messages() {
         assert_eq!(message_text(&msg("text", json!({ "text": "  修一下登录页 " }))), "修一下登录页");
-        let post = json!({ "title": "需求", "content": [[{ "tag": "text", "text": "看看 " }, { "tag": "a", "text": "这个", "href": "https://x" }], [{ "tag": "code_block", "language": "RUST", "text": "fn main() {}\n" }]] });
-        assert_eq!(message_text(&msg("post", post.clone())), "需求\n看看 这个\n```rust\nfn main() {}\n```");
+        let post = json!({ "title": "需求", "content": [[{ "tag": "text", "text": "Look " }, { "tag": "a", "text": "这个", "href": "https://x" }], [{ "tag": "code_block", "language": "RUST", "text": "fn main() {}\n" }]] });
+        assert_eq!(message_text(&msg("post", post.clone())), "需求\nLook 这个\n```rust\nfn main() {}\n```");
         // 外面包了一层语言
-        assert_eq!(message_text(&msg("post", json!({ "zh_cn": post }))), "需求\n看看 这个\n```rust\nfn main() {}\n```");
+        assert_eq!(message_text(&msg("post", json!({ "zh_cn": post }))), "需求\nLook 这个\n```rust\nfn main() {}\n```");
         assert_eq!(message_text(&msg("image", json!({ "image_key": "k" }))), "");
     }
 
@@ -1789,7 +1789,7 @@ mod tests {
     fn group_mentions() {
         let m = json!({
             "message_id": "om_1",
-            "mentions": [{ "key": "@_user_1", "id": { "open_id": "ou_bot" }, "name": "看看" }, { "key": "@_user_2", "id": { "open_id": "ou_x" }, "name": "小王" }],
+            "mentions": [{ "key": "@_user_1", "id": { "open_id": "ou_bot" }, "name": "Look" }, { "key": "@_user_2", "id": { "open_id": "ou_x" }, "name": "小王" }],
         });
         assert!(mentions_bot(&m, "ou_bot"));
         assert!(!mentions_bot(&m, "ou_other"));
@@ -1921,7 +1921,7 @@ mod tests {
         let fake = Fake::start().await;
         crate::feishu::TEST_BASE.set(Box::leak(fake.base.clone().into_boxed_str())).unwrap();
 
-        // 一个已登录的看看（设备 dev1；平台地址连不上，所以没有别的电脑）
+        // 一个已登录的 Look（设备 dev1；平台地址连不上，所以没有别的电脑）
         let home = tempfile::tempdir().unwrap();
         let paths = crate::paths::Paths::discover(Some(home.path().to_path_buf())).unwrap();
         assert!(paths.ttyd.is_some(), "要 ttyd：设置 TTYD_BIN");
@@ -2173,7 +2173,7 @@ mod tests {
 
         // 6. 群：别人 @、自己没 @ 都不理；自己 @ 机器人：在上次的地方直接开会话
         let before = fake.reqs().len();
-        let at_bot = json!([{ "key": "@_user_1", "id": { "open_id": "ou_bot" }, "name": "看看" }]);
+        let at_bot = json!([{ "key": "@_user_1", "id": { "open_id": "ou_bot" }, "name": "Look" }]);
         fake.push("event", msg_ev("om_g1", "group", "ou_other", "text", json!({ "text": "@_user_1 帮我删库" }), None, at_bot.clone())).await;
         fake.push("event", msg_ev("om_g2", "group", "ou_me", "text", json!({ "text": "随便聊聊" }), None, json!([]))).await;
         fake.push("event", msg_ev("om_g3", "group", "ou_me", "text", json!({ "text": "@_user_1 只回复：群" }), None, at_bot)).await;

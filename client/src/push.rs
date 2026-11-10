@@ -2,7 +2,7 @@
 //!
 //! - 和飞书发同样的事（等你处理、做完、出错、卡住、汇总），什么时候发由 `notify.rs` 决定，这里只管把一条消息发出去；
 //! - 不能在消息里处理，只带一个“打开”的链接；
-//! - 配置在同步项 `notify/hooks`（一个数组），地址和密钥由你的电脑直接发给对应的服务，不经过看看的服务器；
+//! - 配置在同步项 `notify/hooks`（一个数组），地址和密钥由你的电脑直接发给对应的服务，不经过 Look 的服务器；
 //! - 会话里来的文字（标题、命令、回复）一律转义，不当 markdown 解析，免得混进链接。
 
 use std::time::Duration;
@@ -144,7 +144,7 @@ pub fn attn(i: &Info, a: &Attn) -> Msg {
                 lines.push(first_lines(a.detail, 5));
             }
             if let Some(rule) = a.guard {
-                lines.push(tr(i.en, &format!("命中了看看的命令规则：{rule}"), &format!("Matches a Looklook command rule: {rule}")));
+                lines.push(tr(i.en, &format!("命中了 Look 的命令规则：{rule}"), &format!("Matches a Look command rule: {rule}")));
             }
         }
         "limit" => lines.push(tr(i.en, "打开后可以等重置自动继续，或者换一个账号。", "Open it to wait for the reset or switch accounts.")),
@@ -225,10 +225,10 @@ pub fn digest(en: bool, n: usize, url: &str) -> Msg {
 /// 设置页“发一条测试”
 pub fn test(en: bool, url: &str) -> Msg {
     Msg {
-        title: tr(en, "看看：测试通知", "Looklook: test notification"),
+        title: tr(en, "Look：测试通知", "Look: test notification"),
         lines: vec![tr(en, "能看到这条，说明配好了。AI 等你处理、做完、出错时会发到这里。", "It works. You'll get a message here when an AI agent needs you, finishes or fails.")],
         url: url.into(),
-        link: tr(en, "打开看看", "Open Looklook"),
+        link: tr(en, "打开 Look", "Open Look"),
     }
 }
 
@@ -236,8 +236,8 @@ pub fn test(en: bool, url: &str) -> Msg {
 pub fn remote_hint(mut m: Msg, en: bool, url: &str) -> Msg {
     m.lines.push(tr(
         en,
-        "这台电脑还没开通远程访问，离开它就打不开看看。开通后出门在外用手机一点就能接着处理（新用户注册送一年）。",
-        "Remote access isn't on for this computer, so Looklook only opens on it. Turn it on to pick things up from your phone anywhere, free for your first year.",
+        "这台电脑还没开通远程访问，离开它就打不开 Look。开通后出门在外用手机一点就能接着处理（新用户注册送一年）。",
+        "Remote access isn't on for this computer, so Look only opens on it. Turn it on to pick things up from your phone anywhere, free for your first year.",
     ));
     m.url = url.into();
     m.link = tr(en, "开通远程访问", "Turn on remote access");
@@ -326,7 +326,7 @@ fn request(h: &Hook, m: &Msg, now_ms: i64) -> Result<Request> {
         }
         Kind::Pushplus => (Url::parse("https://www.pushplus.plus/send")?, json!({ "token": h.target, "title": m.title, "content": markdown(m, md_escape, false), "template": "markdown" }), vec![]),
         Kind::Bark => {
-            let mut j = json!({ "title": m.title, "body": plain(m), "group": "Looklook" });
+            let mut j = json!({ "title": m.title, "body": plain(m), "group": "Look" });
             if !m.url.is_empty() {
                 j["url"] = json!(m.url);
             }
@@ -445,7 +445,7 @@ mod tests {
         let m = test(false, "https://a.example");
         let (u, b, _) = request(&hook(Kind::Serverchan, "SCT1abcdefgh"), &m, 0).unwrap();
         assert_eq!(u.as_str(), "https://sctapi.ftqq.com/SCT1abcdefgh.send");
-        assert!(b["desp"].as_str().unwrap().contains("[打开看看](https://a.example)"));
+        assert!(b["desp"].as_str().unwrap().contains("[打开 Look](https://a.example)"));
         let (u, _, _) = request(&hook(Kind::Serverchan, "sctp123tabcdef"), &m, 0).unwrap();
         assert_eq!(u.as_str(), "https://123.push.ft07.com/send/sctp123tabcdef.send");
         let mut d = hook(Kind::Dingtalk, "https://oapi.dingtalk.com/robot/send?access_token=x");
@@ -461,7 +461,7 @@ mod tests {
         assert_eq!(b["click"], "https://a.example");
         assert_eq!(h, vec![("Authorization", "Bearer tk".to_string())]);
         let (_, b, _) = request(&hook(Kind::Bark, "https://api.day.app/K"), &m, 0).unwrap();
-        assert_eq!(b["group"], "Looklook");
+        assert_eq!(b["group"], "Look");
     }
 
     #[test]

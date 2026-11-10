@@ -285,7 +285,7 @@ pub struct TunnelList {
     pub max: i64,
 }
 
-/// 本机网页的临时分享：在有效期内允许指定的看看账户打开这个网页。
+/// 本机网页的临时分享：在有效期内允许指定的 Look 账户打开这个网页。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PageShare {
     pub id: String,

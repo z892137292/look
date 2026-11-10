@@ -1,4 +1,4 @@
-// 看看自己的终端页（/i/{id}/ 的首页，网关直接返回，不再用 ttyd 内嵌的页面）。
+// Look 自己的终端页（/i/{id}/ 的首页，网关直接返回，不再用 ttyd 内嵌的页面）。
 // 原作 ttyd：Copyright (c) 2016-2022 Shuanglei Tao，MIT 许可（见开源仓库的 THIRD_PARTY_NOTICES.md）。
 // 由 ttyd 1.7.7 的前端（html/src，MIT）移植而来：与 ttyd 的 WebSocket 协议、选项（ttyd 的 -t）、重连、流控、trzsz 都照旧，
 // window.term / term.fit() 也照旧，term-inject.js 不用改。不同的地方：

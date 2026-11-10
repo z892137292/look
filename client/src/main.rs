@@ -1,4 +1,4 @@
-//! 看看客户端（Looklook client）。
+//! Look 客户端（Look client）。
 //!
 //! ```text
 //! looklook                 启动（默认），并在桌面系统上打开管理台
@@ -94,7 +94,7 @@ use crate::store::Store;
 #[command(
     name = "looklook",
     version,
-    about = "看看客户端：随时随地操作你的电脑和 AI 助手\nLooklook client: reach your computer and AI assistants from anywhere",
+    about = "Look 客户端：随时随地操作你的电脑和 AI 助手\nLook client: reach your computer and AI assistants from anywhere",
     after_help = HELP_EXAMPLES
 )]
 struct Cli {
@@ -133,7 +133,7 @@ const HELP_EXAMPLES: &str = "\
 enum Cmd {
     /// 启动客户端（默认）/ Start the client (default)
     Run {
-        /// 看看服务端地址（仅未登录时生效）/ Looklook server URL (only while signed out)
+        /// Look 服务端地址（仅未登录时生效）/ Look server URL (only while signed out)
         #[arg(long, env = "LOOKLOOK_SERVER")]
         server: Option<String>,
         /// 启动后不打开浏览器 / Don't open the browser
@@ -154,7 +154,7 @@ enum Cmd {
         #[command(subcommand)]
         action: Option<RtcCmd>,
     },
-    /// 登录看看账户（在手机或任意浏览器上批准）/ Sign in (approve from your phone or any browser)
+    /// 登录 Look 账户（在手机或任意浏览器上批准）/ Sign in (approve from your phone or any browser)
     Login {
         /// 安装密钥（网页“电脑”页生成，LLK- 开头），不用到浏览器里批准 / Install key (LLK-…, made on the Devices page); no browser approval needed
         #[arg(long, env = "LOOKLOOK_INSTALL_KEY", hide_env_values = true)]
@@ -177,7 +177,7 @@ enum Cmd {
         #[arg(long)]
         check: bool,
     },
-    /// 连接在看看里保存的 SSH 主机（密码由看看提供，不用输入、不会显示）/ Connect to a saved SSH host
+    /// 连接在 Look 里保存的 SSH 主机（密码由 Look 提供，不用输入、不会显示）/ Connect to a saved SSH host
     Ssh {
         /// 主机名称或 id；不填则列出全部 / Host name or id; lists hosts when omitted
         host: Option<String>,
@@ -185,7 +185,7 @@ enum Cmd {
         #[arg(last = true)]
         command: Vec<String>,
     },
-    /// ssh 的 ProxyCommand：经跳板机连接时由看看自己连上跳板机（内部使用）/ ProxyCommand for jump hosts (internal)
+    /// ssh 的 ProxyCommand：经跳板机连接时由 Look 自己连上跳板机（内部使用）/ ProxyCommand for jump hosts (internal)
     #[command(hide = true)]
     SshProxy { jump: String, host: String, port: u16 },
     /// 安装脚本用（Linux）：把安装包目录放进数据目录的 versions/，删掉更高的版本，稳定入口 bin/looklook 指向它
@@ -260,7 +260,7 @@ fn main() -> Result<()> {
     // 启动时把标准输入输出接回父进程的控制台，命令行子命令才看得见输出；双击/开机启动等
     // 没有父控制台的场景这个调用是无害的空操作。其它平台是空实现。
     hardening::attach_console_if_launched_from_terminal();
-    // ssh 把看看当作 SSH_ASKPASS 调用（`<looklook> "<提示>"`）：去找发起连接的 `looklook ssh` 要密码（src/ssh.rs）
+    // ssh 把 Look 当作 SSH_ASKPASS 调用（`<looklook> "<提示>"`）：去找发起连接的 `looklook ssh` 要密码（src/ssh.rs）
     if let Ok(env) = std::env::var(ssh::ASKPASS_ENV) {
         let args: Vec<String> = std::env::args().skip(1).collect();
         if args.len() <= 1 {
@@ -310,7 +310,7 @@ fn main() -> Result<()> {
         }
         Some(Cmd::Status) => {
             let v = rt.block_on(call(&cli.home, cli_listen, "GET", "/api/status", None))?;
-            println!("看看客户端 / Looklook client: {}（运行中 / running）", v["version"].as_str().unwrap_or("-"));
+            println!("Look 客户端 / Look client: {}（运行中 / running）", v["version"].as_str().unwrap_or("-"));
             print_status(&v["account"]);
             if v["account"]["logged_in"].as_bool() == Some(true) {
                 let r = &v["relay"];
@@ -377,7 +377,7 @@ async fn cli_update(home: &Option<PathBuf>, listen: SocketAddr, check_only: bool
     }
     if u["can_install"].as_bool() != Some(true) {
         let reason = u["cannot_reason"].as_str().unwrap_or("unsupported");
-        bail!("不能在这里自动更新（{reason}），请到看看网页的“下载”页下载新版本手动安装\nCan't update automatically here ({reason}); download the new version from the Download page on the Looklook website");
+        bail!("不能在这里自动更新（{reason}），请到 Look 网页的“下载”页下载新版本手动安装\nCan't update automatically here ({reason}); download the new version from the Download page on the Look website");
     }
     call(home, listen, "POST", "/api/update/install", Some(json!({}))).await?;
     let mut last = String::new();
@@ -483,7 +483,7 @@ async fn run(home: Option<PathBuf>, listen: Option<SocketAddr>, server: Option<S
     let no_browser = no_browser || restarted;
     hardening::probe_debugger();
     let entry = versions::entry().map(|p| p.display().to_string());
-    tracing::info!(home = %paths.home.display(), version = account::VERSION, target = paths::target(), exe = ?updater::exe_path(), entry, "看看客户端启动");
+    tracing::info!(home = %paths.home.display(), version = account::VERSION, target = paths::target(), exe = ?updater::exe_path(), entry, "Look 客户端启动");
     if paths.ttyd.is_none() {
         tracing::warn!("没有找到 ttyd，终端无法启动；请使用完整安装包，或设置 TTYD_BIN");
     }
@@ -514,7 +514,7 @@ async fn run(home: Option<PathBuf>, listen: Option<SocketAddr>, server: Option<S
                 }
                 tokio::time::sleep(Duration::from_millis(500)).await;
             }
-            println!("看看已经在运行。");
+            println!("Look 已经在运行。");
             if !no_browser && util::has_desktop() {
                 open_ui(&local_url(&home_opt, fallback)?)?;
             }
@@ -528,7 +528,7 @@ async fn run(home: Option<PathBuf>, listen: Option<SocketAddr>, server: Option<S
     if let Some(url) = server {
         if account.platform().base != url.trim_end_matches('/') {
             match account.set_server(&url) {
-                Ok(()) => tracing::info!(server = %url, "已切换看看服务端"),
+                Ok(()) => tracing::info!(server = %url, "已切换 Look 服务端"),
                 Err(e) => tracing::warn!(error = %e, "无法切换服务端"),
             }
         }
@@ -586,7 +586,7 @@ async fn run(home: Option<PathBuf>, listen: Option<SocketAddr>, server: Option<S
     if let Err(e) = chat.publish(ui_addr) {
         tracing::warn!(error = %e, "无法写入对话界面的 hook 配置");
     }
-    // 用过 DSH 的电脑装好看看的 DSH 插件（见 agents.rs），用户自己运行的 DSH 也能直接在看看里打开
+    // 用过 DSH 的电脑装好 Look 的 DSH 插件（见 agents.rs），用户自己运行的 DSH 也能直接在 Look 里打开
     tokio::task::spawn_blocking(|| {
         if let Err(e) = agents::ensure_dsh_web_plugin(false) {
             tracing::warn!(error = %e, "无法安装 DSH 插件");
@@ -641,7 +641,7 @@ async fn run(home: Option<PathBuf>, listen: Option<SocketAddr>, server: Option<S
 
     let url = format!("{open_base}/");
     *UI_URL.lock().unwrap_or_else(|e| e.into_inner()) = Some(format!("http://{ui_addr}/"));
-    println!("看看客户端已启动：{url}");
+    println!("Look 客户端已启动：{url}");
     let cfg = app.access();
     match (cfg.allow_lan, app.lan_ips.first()) {
         (true, Some(ip)) => println!("局域网里的设备可以打开：http://{ip}:{}/{}", ui_addr.port(), if cfg.code_enabled { "（需要访问码）" } else { "" }),
@@ -751,7 +751,7 @@ fn lock_instance(paths: &Paths) -> std::result::Result<Option<std::fs::File>, ()
     }
 }
 
-/// 上次写下的地址上是不是正在运行的看看（短超时：那个端口上可能是别的、不应答的程序）。
+/// 上次写下的地址上是不是正在运行的 Look（短超时：那个端口上可能是别的、不应答的程序）。
 async fn already_running(home: &Option<PathBuf>, listen: SocketAddr) -> bool {
     let Ok(addr) = endpoint(home, listen) else { return false };
     let Ok(c) = reqwest::Client::builder().no_proxy().timeout(Duration::from_secs(2)).build() else { return false };
@@ -777,8 +777,8 @@ async fn call(home: &Option<PathBuf>, listen: SocketAddr, method: &str, path: &s
     Ok(v)
 }
 
-const NOT_RUNNING: &str = "连不上看看客户端，请先启动它：looklook run（安装为服务时：systemctl --user start looklook）\n\
-Can't reach the Looklook client. Start it with: looklook run (installed as a service: systemctl --user start looklook)";
+const NOT_RUNNING: &str = "连不上 Look 客户端，请先启动它：looklook run（安装为服务时：systemctl --user start looklook）\n\
+Can't reach the Look client. Start it with: looklook run (installed as a service: systemctl --user start looklook)";
 
 /// 授权登录：打印授权码、网址和二维码，等用户在任意设备（通常是手机）的浏览器里批准。
 /// 没有图形界面的服务器就靠它登录；Ctrl+C 取消。
@@ -1030,19 +1030,19 @@ fn cli_error(code: &str, params: &Value) -> String {
     match code {
         "AUTHORIZATION_EXPIRED" => "授权已过期，请重新运行 looklook login / The code expired; run looklook login again".into(),
         "AUTHORIZATION_DENIED" => "授权被拒绝 / Sign-in was denied".into(),
-        "INSTALL_KEY_INVALID" => "安装密钥不对、已过期、已撤销或次数用完了，请在看看网页的“电脑”页重新生成 / The install key is wrong, expired, revoked or used up; make a new one on the Devices page".into(),
-        "INSTALL_KEY_UNSUPPORTED" => "这个看看服务器还不支持安装密钥，请改用 looklook login（不带 --key）/ This Looklook server doesn't support install keys yet; use looklook login without --key".into(),
+        "INSTALL_KEY_INVALID" => "安装密钥不对、已过期、已撤销或次数用完了，请在 Look 网页的“电脑”页重新生成 / The install key is wrong, expired, revoked or used up; make a new one on the Devices page".into(),
+        "INSTALL_KEY_UNSUPPORTED" => "这个 Look 服务器还不支持安装密钥，请改用 looklook login（不带 --key）/ This Look server doesn't support install keys yet; use looklook login without --key".into(),
         "DEVICE_ALREADY_LOGGED_IN" => {
             let name = params["device_name"].as_str().unwrap_or("另一台电脑 / another computer");
             format!(
-                "这个账户已经在“{name}”上登录。请先在那台电脑上退出，或到看看网页的“登录的电脑”里让它退出登录。\n\
-                 This account is already signed in on \"{name}\". Sign out there first, or sign it out under Devices on the Looklook website."
+                "这个账户已经在“{name}”上登录。请先在那台电脑上退出，或到 Look 网页的“登录的电脑”里让它退出登录。\n\
+                 This account is already signed in on \"{name}\". Sign out there first, or sign it out under Devices on the Look website."
             )
         }
         "DEVICE_LIMIT_REACHED" => device_limit_text(params),
-        "MEMBERSHIP_EXPIRED" => "会员已到期，请先在看看网页续费 / Membership expired; renew it on the Looklook website".into(),
+        "MEMBERSHIP_EXPIRED" => "会员已到期，请先在 Look 网页续费 / Membership expired; renew it on the Look website".into(),
         "ACCOUNT_DISABLED" => "账户已停用 / This account is disabled".into(),
-        "NETWORK" => "连不上看看服务器，请检查网络 / Can't reach the Looklook server; check the network".into(),
+        "NETWORK" => "连不上 Look 服务器，请检查网络 / Can't reach the Look server; check the network".into(),
         "ALREADY_LOGGED_IN" => "已经登录了 / Already signed in".into(),
         "CLIENT_VERSION_UNSUPPORTED" => "客户端版本太旧，请先运行 looklook upgrade / This client is too old; run looklook upgrade".into(),
         "VALIDATION_FAILED" => match params["rule"].as_str() {
@@ -1064,7 +1064,7 @@ fn cli_error(code: &str, params: &Value) -> String {
         "UPDATE_NONE" => "已是最新版本 / Already up to date".into(),
         "UPDATE_CHECKSUM" => "下载的安装包校验不通过，请重试 / The download failed its checksum; try again".into(),
         "UPDATE_DOWNLOAD_FAILED" => "下载安装包失败，请检查网络后重试 / Download failed; check the network and try again".into(),
-        "UPDATE_UNSUPPORTED" => "不能在这里自动更新，请到看看网页的“下载”页手动安装 / Can't update automatically here; install from the Download page".into(),
+        "UPDATE_UNSUPPORTED" => "不能在这里自动更新，请到 Look 网页的“下载”页手动安装 / Can't update automatically here; install from the Download page".into(),
         "UPDATE_FAILED" => "安装没有完成，原来的版本保持不变 / Install didn't finish; the previous version is unchanged".into(),
         other => format!("操作失败 / Failed: {other}"),
     }
@@ -1088,7 +1088,7 @@ fn device_limit_text(params: &Value) -> String {
         };
         out.push_str(&format!("\n  · {name}{os}  {state}"));
     }
-    out.push_str("\n请到看看网页的“我的电脑”里让其中一台退出登录，然后再登录。\nSign one of them out under My computers on the Looklook website, then sign in again.");
+    out.push_str("\n请到 Look 网页的“我的电脑”里让其中一台退出登录，然后再登录。\nSign one of them out under My computers on the Look website, then sign in again.");
     out
 }
 

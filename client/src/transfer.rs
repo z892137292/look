@@ -1084,7 +1084,7 @@ mod tests {
         let mux = paths.mux.clone().expect("vendor/ 里没有 mux");
         let conf = paths.tmux_conf();
         let inst = Instances::new(Arc::new(Store::memory().unwrap()), paths.clone());
-        // 测试里 tmux 用自己数据目录下的 socket（见 Instances::tmux_socket_args），不碰正在用的看看
+        // 测试里 tmux 用自己数据目录下的 socket（见 Instances::tmux_socket_args），不碰正在用的 Look
         let sock = inst.tmux_socket_args();
         let id = inst.create(Input { name: Some("xfer".into()), workdir: Some(work.display().to_string()), ..Default::default() }).await.unwrap().row.id;
         inst.start(&id).await.unwrap();

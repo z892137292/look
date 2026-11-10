@@ -250,10 +250,10 @@ export const COMMANDS = [
   ['/worktree', 'worktree'],
 ];
 
-/** Codex（走 app-server）认的内置命令：/compact、/clear 由看看换成对应的请求，其余是界面自己的动作 */
+/** Codex（走 app-server）认的内置命令：/compact、/clear 由 Look 换成对应的请求，其余是界面自己的动作 */
 export const CODEX_COMMANDS = ['/compact', '/clear', '/new', '/model', '/resume', '/context', '/usage', '/status', '/worktree'];
 
-/** 只有 Codex 有的（看看在界面里做）：别的工具不列、不拦 */
+/** 只有 Codex 有的（Look 在界面里做）：别的工具不列、不拦 */
 export const CODEX_ONLY = ['/worktree'];
 
 /** 只和终端外观有关的命令：不在菜单里列出（自己打出来照样送进去） */

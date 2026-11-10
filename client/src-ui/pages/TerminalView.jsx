@@ -139,7 +139,7 @@ const tabsFor = (chat) => (chat ? [CHAT_TAB, ...TABS] : TABS);
 export const hasChat = (inst) => Boolean(CHAT_LAUNCHES.includes(inst?.launch) && inst?.chat_ui);
 
 /**
- * 对话模式的 Codex：终端里的 TUI 接在看看起的 app-server 上（--remote）。第一次打开终端标签时自动接上，
+ * 对话模式的 Codex：终端里的 TUI 接在 Look 起的 app-server 上（--remote）。第一次打开终端标签时自动接上，
  * 之后断了、退出了、换成了本机版，用这个按钮重新接上（终端里还在跑的程序会先退出）。
  */
 function useCodexReconnect(id, inst, frame) {

@@ -1,7 +1,7 @@
 #!/bin/sh
-# 结束正在运行的看看（`looklook run`），给没有 systemd 的环境用（Docker 容器等；有 systemd 时用 systemctl stop）。
-# 只结束看看本身：终端里的会话（looklook-mux）和其中的任务继续运行，终端里运行的 `looklook ssh` 等命令也不碰。
-# Stops the running Looklook (`looklook run`) where there is no systemd. Terminal sessions keep running.
+# 结束正在运行的 Look（`looklook run`），给没有 systemd 的环境用（Docker 容器等；有 systemd 时用 systemctl stop）。
+# 只结束 Look 本身：终端里的会话（looklook-mux）和其中的任务继续运行，终端里运行的 `looklook ssh` 等命令也不碰。
+# Stops the running Look (`looklook run`) where there is no systemd. Terminal sessions keep running.
 # 参数：安装目录（默认是这个脚本所在的目录）/ Optional argument: install directory
 # 数据目录里的版本（versions/<版本>/looklook，自动更新装的、启动时跳过去的）也算。
 PREFIX=${1:-$(cd "$(dirname "$0")" && pwd)}

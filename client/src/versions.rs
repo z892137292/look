@@ -158,7 +158,7 @@ pub fn jump() {
     let run = is_run(&args);
     for e in &entries {
         if e.version > current() && e.bad() && run {
-            eprintln!("看看：{} 试了 {} 次都没能正常启动，跳过 / Looklook: skipping {} after {} failed starts", e.version, e.tries, e.version, e.tries);
+            eprintln!("Look：{} 试了 {} 次都没能正常启动，跳过 / Look: skipping {} after {} failed starts", e.version, e.tries, e.version, e.tries);
         }
     }
     let Some(target) = pick(&entries, &current(), run) else { return };
@@ -177,7 +177,7 @@ pub fn jump() {
     let e = std::os::unix::process::CommandExt::exec(&mut cmd);
     #[cfg(not(unix))]
     let e = std::io::Error::from(std::io::ErrorKind::Unsupported);
-    eprintln!("看看：无法启动 {}（{e}），继续运行 {VERSION} / Looklook: can't start {} ({e}); running {VERSION}", target.exe().display(), target.version);
+    eprintln!("Look：无法启动 {}（{e}），继续运行 {VERSION} / Look: can't start {} ({e}); running {VERSION}", target.exe().display(), target.version);
 }
 
 /// 跳转前的入口（`LOOKLOOK_ENTRY`），在 `main` 里尽早调用一次：读出来后从环境里删掉。
@@ -192,7 +192,7 @@ pub fn entry() -> Option<PathBuf> {
         .clone()
 }
 
-/// 要存下来、以后再运行的看看程序路径（终端里的 SSH 命令、Claude Code 的 hook）：
+/// 要存下来、以后再运行的 Look 程序路径（终端里的 SSH 命令、Claude Code 的 hook）：
 /// 有稳定入口 `{home}/bin/looklook` 时用它，旧版本目录被清理后命令也还能用；否则用当前程序。
 pub fn stable_exe(home: &Path) -> Option<PathBuf> {
     let link = bin_dir(home).join(EXE);

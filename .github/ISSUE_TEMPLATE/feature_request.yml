@@ -4,7 +4,7 @@ labels: [enhancement]
 body:
   - type: markdown
     attributes:
-      value: Check existing issues first. If it's already there, a 👍 counts as a vote. / 先看看路线图和已有 Issue，已有的点 👍 就算投票。
+      value: Check existing issues first. If it's already there, a 👍 counts as a vote. / 先看看已有的 Issue，已有的点 👍 就算投票。
   - type: textarea
     attributes:
       label: What are you trying to do? / 你想做什么？

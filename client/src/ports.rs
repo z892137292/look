@@ -2,7 +2,7 @@
 //!
 //! - Linux 读 `/proc/net/tcp{,6}` 拿到监听套接字的 inode，再扫 `/proc/<pid>/fd` 对上进程（只看得到当前用户的）；
 //!   macOS 用 `lsof`，Windows 用 `netstat -ano`。进程名、命令行、工作目录用 `sysinfo`。
-//! - 去掉看看自己的端口（本进程、ttyd 的端口段、管理台和中转端口）。
+//! - 去掉 Look 自己的端口（本进程、ttyd 的端口段、管理台和中转端口）。
 //! - 认得的程序（OpenClaw、Hermes、开发服务器……）给个名字和一句提示；只按进程名 / 命令行认，端口只作辅助。
 //! - 命令行里像口令的参数换成 `***`：这份列表会显示在远程打开的管理台上。
 
@@ -39,7 +39,7 @@ struct Raw {
     pid: Option<u32>,
 }
 
-/// 列出监听端口，去掉 `skip` 里的和看看自己的进程。认得的网页排在前面，其余按端口排序。
+/// 列出监听端口，去掉 `skip` 里的和 Look 自己的进程。认得的网页排在前面，其余按端口排序。
 pub fn list(skip: impl Fn(u16) -> bool) -> Vec<Listener> {
     let raw = raw();
     let me = std::process::id();
@@ -76,7 +76,7 @@ pub fn list(skip: impl Fn(u16) -> bool) -> Vec<Listener> {
     out
 }
 
-/// 看看自己的程序（另一个看看、它带的终端程序）
+/// Look 自己的程序（另一个 Look、它带的终端程序）
 fn is_ours(name: &str) -> bool {
     let n = name.to_ascii_lowercase();
     n == "looklook" || n == "looklook.exe" || n.starts_with("looklook-")

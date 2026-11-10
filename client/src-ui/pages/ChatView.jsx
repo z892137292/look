@@ -1746,7 +1746,7 @@ function LimitReset({ id }) {
   return at ? <ResetAt at={at} /> : null;
 }
 
-/** 看看替用户选“自动继续”的倒计时 */
+/** Look 替用户选“自动继续”的倒计时 */
 function AutoIn({ at }) {
   const { t } = useT();
   const [, tick] = useReducer((n) => n + 1, 0);
@@ -1824,7 +1824,7 @@ function SwitchProfile({ id, manage, goOn = true }) {
   const [data] = useLoad(() => Promise.all([api.get('/claude-profiles'), api.get(`/instances/${id}`)]).catch(() => null), [id]);
   if (!data) return null;
   const [{ profiles, default: def }, inst] = data;
-  // 容器里的会话不用看看的账号
+  // 容器里的会话不用 Look 的账号
   if (inst.container) return null;
   const cur = inst.claude_profile ?? def;
   const others = profiles.filter((p) => p.id !== cur);
@@ -2169,7 +2169,7 @@ function InputsMenu({ all, onPick, onClose }) {
 
 /**
  * /resume：这台电脑、这个项目里同一个工具以前的对话，选一个在这里接着（不离开这一页）。
- * 当前这段标出来、不能选；已经开在别的看看会话里的，点了打开那个会话。
+ * 当前这段标出来、不能选；已经开在别的 Look 会话里的，点了打开那个会话。
  */
 /**
  * Codex 的 Git 工作树（Codex 0.164 的 /new、/worktree，见 src/chat/codex_worktree.rs）：

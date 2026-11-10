@@ -1,4 +1,4 @@
-// 会员与邀请：到期时间、兑换续期码、会员记录、邀请码与已加入的朋友。数据来自看看平台（shared/platform.js）。
+// 会员与邀请：到期时间、兑换续期码、会员记录、邀请码与已加入的朋友。数据来自 Look 平台（shared/platform.js）。
 // 没有在线支付：续期码由官方发放，在这里兑换。
 import { CalendarClock, CheckCircle2, CloudOff, Gift, History, Plus, Ticket, UserPlus } from 'lucide-react';
 import { useState } from 'react';

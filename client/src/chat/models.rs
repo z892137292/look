@@ -73,7 +73,7 @@ pub fn state_file() -> PathBuf {
 /// 配置目录 `dir` 下 Claude Code 实际用的状态文件，`main` 是平常的位置（`.claude.json`）。跟它自己的找法一样（2.1.310）：
 /// `dir` 里有旧版的 `.config.json`、不是空文件（或者 `main` 还不存在）时用它。
 /// `main` 是个目录时也用 `.config.json`：Docker 把宿主机上不存在的文件映射进来会建成目录，Claude Code 存不了，
-/// 引导、信任目录每次都要重来；看看在 `.config.json` 写上内容后，Claude Code 下次启动就改用它。
+/// 引导、信任目录每次都要重来；Look 在 `.config.json` 写上内容后，Claude Code 下次启动就改用它。
 pub fn state_in(dir: &Path, main: PathBuf) -> PathBuf {
     let legacy = dir.join(".config.json");
     if std::fs::metadata(&legacy).is_ok_and(|m| m.is_file() && (m.len() > 0 || !main.exists())) || main.is_dir() {

@@ -3,8 +3,8 @@
 #
 #   scripts/macos-sign-cert.sh [输出目录]
 #
-# 为什么要：macOS 按代码签名记“允许看看访问文稿 / 桌面 / 下载文件夹”这类授权。ad-hoc 签名每个版本都不一样，
-# 系统把升级后的看看当成另一个程序，每次升级都会重新询问。每个版本都用同一张证书签，授权就一直有效。
+# 为什么要：macOS 按代码签名记“允许 Look 访问文稿 / 桌面 / 下载文件夹”这类授权。ad-hoc 签名每个版本都不一样，
+# 系统把升级后的 Look 当成另一个程序，每次升级都会重新询问。每个版本都用同一张证书签，授权就一直有效。
 # 自签名证书不能让 Gatekeeper 放行（第一次打开仍要在“隐私与安全性”里允许，和 ad-hoc 一样），只解决重复询问。
 #
 # 生成后把输出的两项加到公开仓库（imythu/looklook）的 Actions secrets：
@@ -16,7 +16,7 @@ set -euo pipefail
 
 out=${1:-.}
 mkdir -p "$out"
-name="Looklook Code Signing"
+name="Look Code Signing"
 pass=$(openssl rand -hex 16)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -28,7 +28,7 @@ prompt = no
 x509_extensions = ext
 [dn]
 CN = $name
-O = Looklook
+O = Look
 [ext]
 basicConstraints = critical, CA:false
 keyUsage = critical, digitalSignature

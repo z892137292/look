@@ -1,8 +1,8 @@
 #!/bin/bash
-# 卸载 Looklook 节点（mihomo + 节点小服务 + 防火墙）。
+# 卸载 Look 节点（mihomo + 节点小服务 + 防火墙）。
 #   sudo bash /usr/local/lib/lk-nodes/uninstall.sh          保留节点、订阅、节点密码（/etc/lk-nodes、/var/lib/lk-nodes）
 #   sudo bash /usr/local/lib/lk-nodes/uninstall.sh --purge  全部删掉
-# Looklook 本身用它自己的卸载：~/.local/lib/looklook/uninstall.sh
+# Look 本身用它自己的卸载：~/.local/lib/looklook/uninstall.sh
 set -u
 [ "$(id -u)" = 0 ] || { echo "请用 sudo 运行"; exit 1; }
 LIB=/usr/local/lib/lk-nodes

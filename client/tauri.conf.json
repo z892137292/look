@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Looklook",
+  "productName": "Look",
   "mainBinaryName": "looklook",
   "identifier": "com.looklook.client",
   "build": {},
@@ -14,10 +14,10 @@
   "bundle": {
     "active": true,
     "targets": ["nsis", "app", "dmg"],
-    "publisher": "Looklook",
+    "publisher": "Look",
     "category": "DeveloperTool",
-    "shortDescription": "看看客户端：随时随地操作你的电脑和 AI 助手",
-    "longDescription": "在自己的电脑上运行终端与 AI 助手，并通过看看服务端随时随地访问。",
+    "shortDescription": "Look 客户端：随时随地操作你的电脑和 AI 助手",
+    "longDescription": "在自己的电脑上运行终端与 AI 助手，并通过 Look 服务端随时随地访问。",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

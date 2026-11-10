@@ -3,7 +3,7 @@
 //! - 错误记录：所有 WARN / ERROR 日志（以及管理台页面上的脚本错误）另存一份到 `logs/errors.log`（每行一条 JSON，
 //!   超过 1 MB 轮换成 `errors.log.1`），内存里保留最近 300 条给“设置 → 问题与日志”显示。重启后从文件接上。
 //! - 问题报告：用户填写描述，可选附带运行信息、最近的错误记录和运行日志（发送前可以预览全部内容），
-//!   签名发给看看服务端；没登录或连不上时可以下载成文件自己发给我们。
+//!   签名发给 Look 服务端；没登录或连不上时可以下载成文件自己发给我们。
 //!   附带内容先脱敏：看起来像令牌/密钥的长串、访问码都换成 `[已隐藏]`。
 
 use std::collections::VecDeque;
@@ -293,7 +293,7 @@ pub struct Bundle {
 impl Bundle {
     pub fn text(&self, description: &str) -> String {
         format!(
-            "# 看看客户端问题报告 / Looklook client report\n\n## 描述 / Description\n{description}\n\n## 运行信息 / System\n{}\n\n## 错误记录 / Errors\n{}\n\n## 运行日志 / Log\n{}\n",
+            "# Look 客户端问题报告 / Look client report\n\n## 描述 / Description\n{description}\n\n## 运行信息 / System\n{}\n\n## 错误记录 / Errors\n{}\n\n## 运行日志 / Log\n{}\n",
             serde_json::to_string_pretty(&self.meta).unwrap_or_default(),
             if self.errors.is_empty() { "—" } else { &self.errors },
             if self.logs.is_empty() { "—" } else { &self.logs },

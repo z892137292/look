@@ -30,11 +30,11 @@ pub fn os_name() -> &'static str {
     }
 }
 
-/// 随包的终端服务（ttyd）在安装包里的文件名：用看看自己的名字，任务管理器、防火墙提示里不会出现陌生的“ttyd”。
+/// 随包的终端服务（ttyd）在安装包里的文件名：用 Look 自己的名字，任务管理器、防火墙提示里不会出现陌生的“ttyd”。
 pub const TERM_EXE: &str = if cfg!(windows) { "looklook-term.exe" } else { "looklook-term" };
 /// 旧版安装包与开发时 vendor/ 里的原名
 const LEGACY_TERM_EXE: &str = if cfg!(windows) { "ttyd.exe" } else { "ttyd" };
-/// 随包的会话保持程序（Linux/macOS 是静态编译的 tmux，Windows 是 psmux）：同样改成看看自己的名字。
+/// 随包的会话保持程序（Linux/macOS 是静态编译的 tmux，Windows 是 psmux）：同样改成 Look 自己的名字。
 /// Windows 例外，必须叫 psmux.exe：psmux 每次运行都按进程名（psmux/tmux/pmux）确认登记的会话服务还活着，
 /// 改了名的服务会被当成已经退出，登记文件随即被删——新建会话报“failed to create session”。
 pub const MUX_EXE: &str = if cfg!(windows) { "psmux.exe" } else { "looklook-mux" };
@@ -136,7 +136,7 @@ pub fn find_trzsz() -> Option<PathBuf> {
     resource_dirs().into_iter().map(|d| d.join(TRZSZ_DIR)).find(|p| p.join(TRZSZ_EXES[0]).is_file())
 }
 
-/// macOS 应用包（`Looklook.app/Contents/MacOS/looklook`）的资源目录 `Contents/Resources`。
+/// macOS 应用包（`Look.app/Contents/MacOS/looklook`）的资源目录 `Contents/Resources`。
 pub fn bundle_resources(exe_dir: &Path) -> Option<PathBuf> {
     if !cfg!(target_os = "macos") || !exe_dir.ends_with("Contents/MacOS") {
         return None;

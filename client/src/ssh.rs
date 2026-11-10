@@ -1,18 +1,18 @@
-//! SSH 主机管理：保存常用的服务器，一键在看看里打开 SSH 终端；允许的话，AI 助手也能经 MCP 在上面运行命令，
+//! SSH 主机管理：保存常用的服务器，一键在 Look 里打开 SSH 终端；允许的话，AI 助手也能经 MCP 在上面运行命令，
 //! 但始终拿不到密码、私钥。
 //!
 //! - 主机列表存在本机数据库（`ssh_hosts`）；密码 / 私钥口令用 ChaCha20-Poly1305 加密后单独存（`ssh_secret:{id}`），
 //!   密钥文件 `{LOOKLOOK_HOME}/ssh/secret.key`（0600）。私钥两种来源：这台电脑上的文件只记路径（一般是 `~/.ssh/id_ed25519`），
 //!   不复制；从浏览器上传的私钥同样加密存进数据库（`ssh_key:{id}`），连接时写成 0600 的临时文件交给 ssh，用完即删；
 //! - 跳板机就是另一台保存的主机（`jump` 记它的 id，可以层层嵌套）。ssh 的 ProxyCommand 是 `looklook ssh-proxy <跳板机> %h %p`：
-//!   每一跳由看看自己按那台主机的登录方式连接（`ssh -W`），各自的密码、私钥互不相混；
+//!   每一跳由 Look 自己按那台主机的登录方式连接（`ssh -W`），各自的密码、私钥互不相混；
 //!   登录方式选“跳板机代登”（`jump`）时不走 ProxyCommand：先登录跳板机，在跳板机上运行 `ssh` 连这台，
-//!   用的是跳板机上已经配置好的密钥（跳板机的 `~/.ssh`、ssh-agent），看看不为这台保存任何秘密；
+//!   用的是跳板机上已经配置好的密钥（跳板机的 `~/.ssh`、ssh-agent），Look 不为这台保存任何秘密；
 //! - 连接用系统自带的 `ssh`。需要密码时，ssh 通过 `SSH_ASKPASS` 回头找启动它的 `looklook ssh` 进程要：
 //!   环境变量里只有一个本机端口和一次性的随机口令，密码不出现在命令行参数、环境变量、文件或终端输出里；
 //! - MCP（gateway/mcp.rs）只能用标了“允许 AI 使用”的主机，输出里出现的已存密码、私钥块、常见令牌都换成 `[redacted]`。
 //!
-//! 局限：AI 助手和看看以同一个系统用户运行，真想偷的程序可以读这台电脑上用户能读的任何东西（包括 `~/.ssh`）。
+//! 局限：AI 助手和 Look 以同一个系统用户运行，真想偷的程序可以读这台电脑上用户能读的任何东西（包括 `~/.ssh`）。
 //! 这里防的是“顺手”泄露——密码被打进对话、日志、截图，或被 AI 从配置文件里读出来带进上下文。
 
 use std::io::{BufRead, BufReader, Read, Write};
@@ -40,7 +40,7 @@ const KEY_MAX: usize = 32 * 1024;
 /// 跳板机最多嵌套几层（防止数据被改坏后无限套娃）
 const JUMP_DEPTH_MAX: u32 = 5;
 const JUMP_DEPTH_ENV: &str = "LOOKLOOK_SSH_DEPTH";
-/// ssh 调用 askpass 时，看看用这个环境变量找到发起连接的进程：`端口:口令`
+/// ssh 调用 askpass 时，Look 用这个环境变量找到发起连接的进程：`端口:口令`
 pub const ASKPASS_ENV: &str = "LOOKLOOK_ASKPASS";
 /// MCP 运行命令的输出上限（每路）
 pub const OUTPUT_MAX: usize = 64 * 1024;
@@ -700,7 +700,7 @@ pub fn ssh_args(h: &SshHost, batch: bool, route: &Route) -> Vec<String> {
     a
 }
 
-/// ProxyCommand：`<看看程序> ssh-proxy <跳板机 id> %h %p`。ssh 用 shell 运行它（Windows 上直接拆参数），
+/// ProxyCommand：`<Look 程序> ssh-proxy <跳板机 id> %h %p`。ssh 用 shell 运行它（Windows 上直接拆参数），
 /// 程序路径要加引号；`%` 是 ssh 的占位符前缀，路径里的要写成 `%%`。
 fn proxy_command(exe: &Path, jump: &str) -> String {
     let exe = exe.display().to_string().replace('%', "%%");
@@ -716,7 +716,7 @@ struct TempKey {
 
 impl TempKey {
     fn write(store: &Store, home: &Path, id: &str) -> Result<Self> {
-        let text = stored_key(store, home, id)?.context("上传的私钥不见了，请在看看的“SSH 主机”里重新上传")?;
+        let text = stored_key(store, home, id)?.context("上传的私钥不见了，请在 Look 的“SSH 主机”里重新上传")?;
         let dir = home.join("ssh").join("keys");
         std::fs::create_dir_all(&dir)?;
         #[cfg(unix)]
@@ -891,7 +891,7 @@ fn prepare_at(store: &Store, home: &Path, h: &SshHost, remote: &[String], batch:
         if depth >= JUMP_DEPTH_MAX {
             bail!("跳板机嵌套太多层了（最多 {JUMP_DEPTH_MAX} 层）");
         }
-        let jump = list(store).into_iter().find(|j| j.id == h.jump).with_context(|| format!("“{}”的跳板机已被删除，请在看看里重新选择", h.name))?;
+        let jump = list(store).into_iter().find(|j| j.id == h.jump).with_context(|| format!("“{}”的跳板机已被删除，请在 Look 里重新选择", h.name))?;
         let inner = hop_command(h, remote, batch, forward.as_deref());
         return prepare_at(store, home, &jump, &[inner], batch, None, forward.is_none(), depth + 1, verbose);
     }
@@ -906,8 +906,8 @@ fn prepare_at(store: &Store, home: &Path, h: &SshHost, remote: &[String], batch:
         if depth >= JUMP_DEPTH_MAX {
             bail!("跳板机嵌套太多层了（最多 {JUMP_DEPTH_MAX} 层）");
         }
-        let jump = list(store).into_iter().find(|j| j.id == h.jump).with_context(|| format!("“{}”的跳板机已被删除，请在看看里重新选择", h.name))?;
-        let exe = std::env::current_exe().context("找不到看看程序的路径")?;
+        let jump = list(store).into_iter().find(|j| j.id == h.jump).with_context(|| format!("“{}”的跳板机已被删除，请在 Look 里重新选择", h.name))?;
+        let exe = std::env::current_exe().context("找不到 Look 程序的路径")?;
         // 下一跳由 `looklook ssh-proxy` 连接：让它找到同一个数据目录，并记着已经套了几层
         cmd.env("LOOKLOOK_HOME", home).env(JUMP_DEPTH_ENV, (depth + 1).to_string());
         Some(proxy_command(&exe, &jump.id))
@@ -919,7 +919,7 @@ fn prepare_at(store: &Store, home: &Path, h: &SshHost, remote: &[String], batch:
     let askpass = match &secret {
         Some(s) => {
             let a = Askpass::start(s.clone())?;
-            let exe = std::env::current_exe().context("找不到看看程序的路径")?;
+            let exe = std::env::current_exe().context("找不到 Look 程序的路径")?;
             cmd.env("SSH_ASKPASS", exe).env("SSH_ASKPASS_REQUIRE", "force").env(ASKPASS_ENV, &a.env);
             // 老版本 OpenSSH 只在有 DISPLAY 时才用 askpass
             if std::env::var_os("DISPLAY").is_none() {
@@ -969,11 +969,11 @@ pub fn proxy_cli(store: &Store, home: &Path, jump: &str, host: &str, port: u16) 
     Ok(status.code().unwrap_or(255))
 }
 
-/// `looklook ssh <主机> [-- 远程命令…]`：交互式连接（看看的 SSH 终端就是在 shell 里运行这个）。
+/// `looklook ssh <主机> [-- 远程命令…]`：交互式连接（Look 的 SSH 终端就是在 shell 里运行这个）。
 pub fn connect_cli(store: &Store, home: &Path, key: &str, remote: &[String]) -> Result<i32> {
-    let h = find(store, key).with_context(|| format!("没有叫 {key:?} 的 SSH 主机（在看看的“SSH 主机”页添加）"))?;
+    let h = find(store, key).with_context(|| format!("没有叫 {key:?} 的 SSH 主机（在 Look 的“SSH 主机”页添加）"))?;
     let via = list(store).into_iter().find(|j| j.id == h.jump).map(|j| format!(" · 经 {}", j.name)).unwrap_or_default();
-    eprintln!("\x1b[2m看看 · SSH {} ({}@{}:{}){via}\x1b[0m", h.name, h.user, h.host, h.port);
+    eprintln!("\x1b[2mLook · SSH {} ({}@{}:{}){via}\x1b[0m", h.name, h.user, h.host, h.port);
     let mut p = prepare(store, home, &h, remote, false)?;
     if p._key.is_some() || !h.jump.is_empty() {
         outlive_hangup();
@@ -1704,7 +1704,7 @@ mod tests {
         assert_eq!(save(&store, tmp.path(), Some(&bastion.id), b).unwrap_err().params["rule"], "jump_loop");
         // 还被用着的跳板机不能删
         assert_eq!(delete(&store, &bastion.id).unwrap_err().code, "SSH_JUMP_IN_USE");
-        // 经跳板机：ProxyCommand 交给看看自己
+        // 经跳板机：ProxyCommand 交给 Look 自己
         let p = prepare(&store, tmp.path(), &saved.host, &[], true).unwrap();
         let args: Vec<String> = p.cmd.get_args().map(|a| a.to_string_lossy().into_owned()).collect();
         let proxy = args.iter().find(|a| a.starts_with("ProxyCommand=")).unwrap();

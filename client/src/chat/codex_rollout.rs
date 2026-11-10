@@ -227,7 +227,7 @@ impl Rollout {
             t if SKIPPED_ITEMS.contains(&t) => {}
             "" => self.stats.unknown += 1,
             // 新版本 Codex 加的、还不认识的条目：不丢掉，按它的类型名显示成一张普通的工具卡片（参数折叠着），
-            // 升级 Codex 后至少看得到它做了什么，不用等看看适配
+            // 升级 Codex 后至少看得到它做了什么，不用等 Look 适配
             t => {
                 self.stats.unknown += 1;
                 let content = ["aggregated_output", "output", "result", "text"].iter().find_map(|k| it[*k].as_str()).unwrap_or("").to_string();
@@ -494,7 +494,7 @@ fn data_url(url: &str) -> Option<(&'static str, Vec<u8>)> {
 }
 
 /// 记录里最后一条 `token_count`，换成 app-server `thread/tokenUsage/updated` 的 `tokenUsage` 的样子。
-/// 刚接上（看看重启、重新加载会话）时 app-server 要等下一轮才发用量，先用它把上下文用量填上。只读文件末尾一段。
+/// 刚接上（Look 重启、重新加载会话）时 app-server 要等下一轮才发用量，先用它把上下文用量填上。只读文件末尾一段。
 pub fn last_token_usage(path: &Path) -> Option<Value> {
     const TAIL: u64 = 1 << 20;
     let mut f = std::fs::File::open(path).ok()?;

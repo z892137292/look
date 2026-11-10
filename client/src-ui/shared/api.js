@@ -1,4 +1,4 @@
-// 本机接口：同源、JSON；写请求带 X-Looklook-Client（避开平台保留的 X-LL-*）。错误统一抛出 ApiError（code + params）。
+// 本机接口：同源、JSON；写请求带 X-Look-Client（避开平台保留的 X-LL-*）。错误统一抛出 ApiError（code + params）。
 
 export class ApiError extends Error {
   constructor(status, code, params = {}) {
@@ -80,7 +80,7 @@ export async function fetchDevices() {
 
 async function request(method, path, body, options = {}) {
   const headers = { Accept: 'application/json' };
-  if (method !== 'GET') headers['X-Looklook-Client'] = '1';
+  if (method !== 'GET') headers['X-Look-Client'] = '1';
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   const device = await deviceFor(path, options);
   if (device) headers['X-LL-Device'] = device;

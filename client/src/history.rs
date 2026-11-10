@@ -46,7 +46,7 @@ pub struct Conv {
     pub updated_ms: i64,
     /// 最近两分钟还在写，可能正在别处运行
     pub live: bool,
-    /// 正在某个看看会话里（见 gateway 里的 `list_history`）
+    /// 正在某个 Look 会话里（见 gateway 里的 `list_history`）
     pub instance_id: Option<String>,
     /// 对话开始的时间（记录里的第一条）
     pub started_at: Option<String>,

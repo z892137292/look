@@ -136,7 +136,7 @@ def build(args):
     os.makedirs(os.path.join(tmp, "wenkai"))
 
     css = [
-        "/* 看看终端字体：JetBrains Mono（英文）+ 霞鹜文楷等宽 LXGW WenKai Mono（中文，按字频分片按需加载）。",
+        "/* Look 终端字体：JetBrains Mono（英文）+ 霞鹜文楷等宽 LXGW WenKai Mono（中文，按字频分片按需加载）。",
         "   两者均使用 SIL Open Font License 1.1，许可证见同目录 LICENSE-*.txt。由 scripts/build-fonts.py 生成。 */",
     ]
     with zipfile.ZipFile(args.jetbrains) as z:

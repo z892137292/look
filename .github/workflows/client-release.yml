@@ -1,7 +1,7 @@
-# 看看客户端发布（手动触发；维护者在私有仓库里用 scripts/release.sh publish 导出代码、推送并触发）：
+# Look 客户端发布（手动触发；维护者在私有仓库里用 scripts/release.sh publish 导出代码、推送并触发）：
 # 检查版本与更新说明 → 三个平台并行构建安装包（Linux、Windows、macOS 各用一台 runner）
 # → 汇总生成 release.json 与 SHA256SUMS → 打标签 client-v{版本} 并创建 GitHub Release（附全部安装包）。
-# 看看服务端定期同步这里最新的 10 个 Release 到自己的下载目录（官网下载用这些文件），也可以直接从 Release 下载。
+# Look 服务端定期同步这里最新的 10 个 Release 到自己的下载目录（官网下载用这些文件），也可以直接从 Release 下载。
 # macOS 必须在 macOS runner 上原生编译：托盘等依赖要链接 Apple 系统框架，Linux 上用 zig 交叉编译没有 macOS SDK。
 # Windows 与 Linux 包在 Linux runner 上用 zig 交叉编译（各自独立的 job，并行）。任何一个平台失败都不会发布。
 # Windows / macOS 另外产出桌面应用安装程序（Tauri：NSIS setup.exe、.dmg），随版本一起发布。
@@ -211,7 +211,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/zig" && tar -C "$RUNNER_TEMP/zig" -xJf /tmp/zig.tar.xz
           echo "$RUNNER_TEMP/zig/zig-aarch64-macos-$ZIG_VERSION" >> "$GITHUB_PATH"
 
-      # 代码签名：每个版本都用同一张（自签名）证书签，macOS 才把升级后的看看认成同一个应用，不再重新询问文件夹访问权限。
+      # 代码签名：每个版本都用同一张（自签名）证书签，macOS 才把升级后的 Look 认成同一个应用，不再重新询问文件夹访问权限。
       # 证书由 client/scripts/macos-sign-cert.sh 生成一次，放在 secrets 里；没有时 ad-hoc 签名（照常能用，只是升级后会再问）。
       - name: 导入签名证书
         env:
@@ -317,7 +317,7 @@ jobs:
           git push origin "client-v$VERSION"
           dir="dist/release/$VERSION"
           python3 -c 'import json,sys; i=json.load(open(sys.argv[1])); print("### 中文\n\n" + i["notes_zh"] + "\n\n### English\n\n" + i["notes_en"])' "$dir/release.json" > /tmp/notes.md
-          flags=(--title "Looklook client $VERSION" --notes-file /tmp/notes.md --verify-tag)
+          flags=(--title "Look client $VERSION" --notes-file /tmp/notes.md --verify-tag)
           # beta 通道或带预发布后缀的版本号（如 1.0.1-beta）标为 Pre-release
           [[ $CHANNEL == stable && $VERSION != *-* ]] || flags+=(--prerelease)
           gh release create "client-v$VERSION" "$dir"/* "${flags[@]}"

@@ -1,6 +1,6 @@
 // 设置 → 访问控制：其他设备能不能直接打开这台电脑上的管理台。
 // 这台电脑自己总是可以打开；局域网要勾选允许；白名单是额外允许的 IP、网段或域名（DDNS）；访问码可选，只存在本机。
-// 修改立即生效（开关点一下就保存），不需要重启看看。
+// 修改立即生效（开关点一下就保存），不需要重启 Look。
 import { KeyRound, Plus, RefreshCw, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -156,8 +156,8 @@ function OpenHost({ data, save, busy }) {
 /** Windows 第一次运行时防火墙会弹窗（管理台监听所有网卡）：说明怎么选、选错了怎么改。 */
 function WindowsFirewall({ exe }) {
   const { t } = useTranslation();
-  const program = exe || '$env:LOCALAPPDATA\\Looklook\\looklook.exe';
-  const ps = `New-NetFirewallRule -DisplayName "Looklook LAN" -Direction Inbound -Action Allow -Profile Private -Program "${program}"`;
+  const program = exe || '$env:LOCALAPPDATA\\Look\\looklook.exe';
+  const ps = `New-NetFirewallRule -DisplayName "Look LAN" -Direction Inbound -Action Allow -Profile Private -Program "${program}"`;
   return (
     <details className="fw">
       <summary>{t('access.fw_title')}</summary>

@@ -1,7 +1,7 @@
 //! 桌面应用（Windows / macOS）：Tauri 窗口直接显示管理台，系统托盘常驻。
 //!
 //! 启动后打开应用窗口（不再打开浏览器）；关掉窗口只是隐藏，服务继续在后台运行，
-//! 点托盘图标（macOS 也可以点程序坞图标）重新显示。托盘菜单：打开看看 / 启动服务 /
+//! 点托盘图标（macOS 也可以点程序坞图标）重新显示。托盘菜单：打开 Look / 启动服务 /
 //! 停止服务 / 开机启动 / 退出。开机自启（`run --no-browser`）只启动服务、不弹窗口。
 //!
 //! macOS：只有窗口显示时程序坞里才有图标（就是应用图标），窗口隐藏后切换成
@@ -151,7 +151,7 @@ pub fn run(rt: tokio::runtime::Runtime, home: Option<PathBuf>, listen: Option<So
                 let _ = rx.recv_timeout(Duration::from_secs(10));
             }
             // 不再回到 Tauri / AppKit 去调 exit()：后台线程还在时析构全局对象会崩溃（见 util::exit_now）
-            tracing::info!("看看已退出");
+            tracing::info!("Look 已退出");
             crate::util::exit_now(0);
         }
         #[cfg(target_os = "macos")]
@@ -208,7 +208,7 @@ fn show_main(app: &AppHandle) {
 }
 
 /// 管理台窗口。网页里 `window.open` 的本机页面（终端“新标签页打开”等）开成新的应用窗口，
-/// 其它网址（看看网站、会员页、授权页）交给系统浏览器。
+/// 其它网址（Look 网站、会员页、授权页）交给系统浏览器。
 ///
 /// `console`：本机管理台地址；`url`：窗口一开始加载的地址。网页新开的窗口先加载 about:blank，由 WebKit / WebView2
 /// 把请求的页面载入返回的窗口（Tauri 文档的做法）。自己再加载一次目标地址会有两次导航，前一次被取消后
@@ -218,7 +218,7 @@ fn window<'a>(app: &'a AppHandle, label: &str, console: Url, url: Url) -> Webvie
     WebviewWindowBuilder::new(app, label, WebviewUrl::External(url))
         // 管理台据此知道自己在桌面应用里（例如 DSH 改由系统浏览器打开）
         .initialization_script("window.__LOOKLOOK_DESKTOP__ = true;")
-        .title(tr("看看", "Looklook"))
+        .title(tr("Look", "Look"))
         // macOS：窗口在后台时点一下就生效（例如直接切到侧栏里的会话），不用先点一下把窗口叫到前面
         .accept_first_mouse(true)
         .on_document_title_changed(|w, title| {
@@ -287,7 +287,7 @@ struct Items {
 }
 
 fn tray(app: &AppHandle) -> tauri::Result<Items> {
-    let open = MenuItem::with_id(app, "open", tr("打开看看", "Open Looklook"), true, None::<&str>)?;
+    let open = MenuItem::with_id(app, "open", tr("打开 Look", "Open Look"), true, None::<&str>)?;
     let start = MenuItem::with_id(app, "start", tr("启动服务", "Start service"), false, None::<&str>)?;
     let stop = MenuItem::with_id(app, "stop", tr("停止服务", "Stop service"), true, None::<&str>)?;
     let auto = CheckMenuItem::with_id(app, "autostart", tr("开机启动", "Launch at startup"), true, autostart::is_enabled(), None::<&str>)?;
@@ -295,7 +295,7 @@ fn tray(app: &AppHandle) -> tauri::Result<Items> {
     let sep1 = PredefinedMenuItem::separator(app)?;
     let sep2 = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(app, &[&open, &start, &stop, &sep1, &auto, &sep2, &exit])?;
-    let mut tray = TrayIconBuilder::with_id("main").menu(&menu).tooltip(tr("看看客户端", "Looklook client"));
+    let mut tray = TrayIconBuilder::with_id("main").menu(&menu).tooltip(tr("Look 客户端", "Look client"));
     if let Some(icon) = app.default_window_icon() {
         tray = tray.icon(icon.clone());
     }
@@ -403,14 +403,14 @@ async fn refresh_menu(items: Items, running: Arc<AtomicBool>) {
     }
 }
 
-/// 关掉 App Nap。看看平时只在托盘里（主窗口隐藏），macOS 会把它当成“看不见的应用”节流：定时器被合并、推迟，
+/// 关掉 App Nap。Look 平时只在托盘里（主窗口隐藏），macOS 会把它当成“看不见的应用”节流：定时器被合并、推迟，
 /// 后台网络也降级。远程入口靠每 5 秒一个的在线心跳判断这台电脑在不在线（超过 16 秒没收到就算离线），
-/// 心跳一迟到，从远程地址打开就显示“设备离线”，而这台 Mac 上看看明明开着。
+/// 心跳一迟到，从远程地址打开就显示“设备离线”，而这台 Mac 上 Look 明明开着。
 /// 声明一个“用户发起、允许系统空闲睡眠”的活动：不阻止合盖 / 空闲睡眠（睡着了本来就连不上），只是不再被节流。
 #[cfg(target_os = "macos")]
 fn disable_app_nap() {
     use objc2_foundation::{NSActivityOptions, NSProcessInfo, NSString};
-    let reason = NSString::from_str("Looklook keeps your terminals reachable from your phone and other computers");
+    let reason = NSString::from_str("Look keeps your terminals reachable from your phone and other computers");
     let activity = NSProcessInfo::processInfo().beginActivityWithOptions_reason(NSActivityOptions::UserInitiatedAllowingIdleSystemSleep, &reason);
     // 活动在令牌释放时结束；整个进程期间都要，所以不释放
     std::mem::forget(activity);
@@ -421,7 +421,7 @@ fn disable_app_nap() {
 fn mac_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     use tauri::menu::SubmenuBuilder;
     // 自己的“退出”：走 app.exit 先停服务。编辑菜单不能省，否则网页里 ⌘C / ⌘V 不起作用。
-    let quit = MenuItem::with_id(app, "quit", tr("退出看看", "Quit Looklook"), true, Some("CmdOrCtrl+Q"))?;
+    let quit = MenuItem::with_id(app, "quit", tr("退出 Look", "Quit Look"), true, Some("CmdOrCtrl+Q"))?;
     // 常用快捷键（见 page_command）
     let settings = MenuItem::with_id(app, "settings", tr("设置…", "Settings…"), true, Some("CmdOrCtrl+,"))?;
     let new_session = MenuItem::with_id(app, "new_session", tr("新会话", "New Session"), true, Some("CmdOrCtrl+N"))?;
@@ -432,7 +432,7 @@ fn mac_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let zoom_in = MenuItem::with_id(app, "zoom_in", tr("放大", "Zoom In"), true, Some("CmdOrCtrl+="))?;
     let zoom_out = MenuItem::with_id(app, "zoom_out", tr("缩小", "Zoom Out"), true, Some("CmdOrCtrl+-"))?;
     let zoom_reset = MenuItem::with_id(app, "zoom_reset", tr("实际大小", "Actual Size"), true, Some("CmdOrCtrl+0"))?;
-    let main = SubmenuBuilder::new(app, tr("看看", "Looklook"))
+    let main = SubmenuBuilder::new(app, tr("Look", "Look"))
         .about(None)
         .separator()
         .item(&settings)
@@ -509,7 +509,7 @@ fn spawn_server(home: Option<PathBuf>, listen: Option<SocketAddr>, server: Optio
     let child = token.clone();
     let handle = tokio::spawn(async move {
         if let Err(e) = crate::run(home, listen, server, true, child).await {
-            tracing::error!(error = %e, "看看服务未能启动");
+            tracing::error!(error = %e, "Look 服务未能启动");
         }
     });
     (token, handle)
@@ -524,10 +524,10 @@ mod autostart {
         use std::path::PathBuf;
 
         // 安装包（packaging/nsis-hooks.nsh，旧的 install-windows.bat 也一样）在“启动”文件夹里建
-        // “看看.lnk”；这里为了不额外引入 COM 依赖，打开开关时放一个小的 .cmd 启动脚本。
+        // “Look.lnk”；这里为了不额外引入 COM 依赖，打开开关时放一个小的 .cmd 启动脚本。
         // 两者任意一个存在就算开着，关掉时两个都删。
         const FILE_NAME: &str = "looklook-tray-autostart.cmd";
-        const SHORTCUT: &str = "看看.lnk";
+        const SHORTCUT: &str = "Look.lnk";
 
         fn startup() -> Option<PathBuf> {
             dirs::config_dir().map(|d| d.join("Microsoft").join("Windows").join("Start Menu").join("Programs").join("Startup"))
@@ -612,7 +612,7 @@ mod autostart {
     pub use imp::{is_enabled, set_enabled};
 
     /// macOS 第一次打开应用时默认开启登录自启（远程访问要求客户端一直在运行），之后以用户的选择为准。
-    /// 旧版安装脚本的登录项（同一个 Label）指向 ~/Applications/Looklook，在这里换成应用包，
+    /// 旧版安装脚本的登录项（同一个 Label）指向 ~/Applications/Look，在这里换成应用包，
     /// 并等旧进程放开数据目录的锁。
     #[cfg(target_os = "macos")]
     pub fn default_on(home: Option<&std::path::PathBuf>) {

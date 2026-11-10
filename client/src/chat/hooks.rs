@@ -98,7 +98,7 @@ pub fn settings_json(exe: &Path, endpoint: &Path) -> Value {
     json!({ "hooks": hooks, "skipDangerousModePermissionPrompt": true })
 }
 
-/// hook 用的程序：看看自己。开发、测试时可以用 `LOOKLOOK_HOOK_EXE` 指定（`cargo test` 里当前程序是测试程序）。
+/// hook 用的程序：Look 自己。开发、测试时可以用 `LOOKLOOK_HOOK_EXE` 指定（`cargo test` 里当前程序是测试程序）。
 /// Linux 上用稳定入口 `bin/looklook`：运行中的 Claude Code 一直用启动时读到的路径，版本目录被清理后也要能调用。
 pub fn hook_exe(paths: &Paths) -> PathBuf {
     std::env::var_os("LOOKLOOK_HOOK_EXE")
@@ -223,7 +223,7 @@ mod tests {
 
     #[test]
     fn windows_paths_for_git_bash() {
-        assert_eq!(shell_path(r"\\?\G:\Program Files\Looklook\looklook.exe", true), "G:/Program Files/Looklook/looklook.exe");
+        assert_eq!(shell_path(r"\\?\G:\Program Files\Look\looklook.exe", true), "G:/Program Files/Look/looklook.exe");
         assert_eq!(shell_path(r"C:\Users\a\AppData\Roaming\looklook\run\hook.json", true), "C:/Users/a/AppData/Roaming/looklook/run/hook.json");
         assert_eq!(shell_path(r"\\?\UNC\nas\share\looklook.exe", true), "//nas/share/looklook.exe");
         assert_eq!(shell_path("/opt/a$b/look`x\"y", false), "/opt/a\\$b/look\\`x\\\"y");

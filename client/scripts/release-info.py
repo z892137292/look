@@ -7,7 +7,7 @@
 任何一份缺失或为空都会失败。
 
 产物 dist/release/{版本}/：安装包与桌面安装程序（硬链接/复制自 dist/）、release.json、SHA256SUMS。
-整个目录作为 GitHub Release（标签 client-v{版本}）发布；看看服务端按 release.json 同步安装包、提供检查更新与下载。
+整个目录作为 GitHub Release（标签 client-v{版本}）发布；Look 服务端按 release.json 同步安装包、提供检查更新与下载。
 """
 
 import argparse

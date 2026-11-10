@@ -51,7 +51,7 @@ function putChunk(uid, offset, blob, onProgress, signal) {
     xhr.open('PUT', `/api/uploads/${encodeURIComponent(uid)}?offset=${offset}`);
     xhr.withCredentials = true;
     xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-    xhr.setRequestHeader('X-Looklook-Client', '1');
+    xhr.setRequestHeader('X-Look-Client', '1');
     if (device) xhr.setRequestHeader('X-LL-Device', device);
     xhr.setRequestHeader('Accept', 'application/json');
     xhr.upload.onprogress = (e) => {

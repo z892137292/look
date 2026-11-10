@@ -1,4 +1,4 @@
-/* 看看 设计系统：安静、明亮、圆润；移动端优先，触控区域 ≥ 44px，320px 宽度无横向滚动。 */
+/* Look 设计系统：安静、明亮、圆润；移动端优先，触控区域 ≥ 44px，320px 宽度无横向滚动。 */
 :root {
   --bg: #f7f8fc;
   --panel: #ffffff;
@@ -400,7 +400,7 @@ input[type="checkbox"], input[type="radio"] { width: auto; min-height: 0; paddin
 
 
 /* =====================================================================
-   看看客户端专用
+   Look 客户端专用
    ===================================================================== */
 .topbar .status { font-size: 13px; color: var(--muted); }
 /* 右上角的连接胶囊（本机 / 局域网 / 远程同一个位置，shared/RelayStatus.jsx 的 ConnChip） */
@@ -799,7 +799,7 @@ input[type="checkbox"], input[type="radio"] { width: auto; min-height: 0; paddin
   .settings-tab .dot-badge { top: 50%; right: 12px; transform: translateY(-50%); }
 }
 
-/* ---------- 登录页：看看是做什么的 ---------- */
+/* ---------- 登录页：Look 是做什么的 ---------- */
 .qa { padding: 0; }
 .qa summary { cursor: pointer; padding: 14px 18px; font-weight: 600; min-height: 48px; list-style-position: inside; }
 .qa[open] summary { border-bottom: 1px solid var(--line); }

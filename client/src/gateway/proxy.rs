@@ -81,7 +81,7 @@ pub async fn forward(client: &HttpClient, mut req: Request, port: u16, opts: Opt
     parts.version = Version::HTTP_11;
     let h = &mut parts.headers;
     strip_hop_by_hop(h);
-    // 访问码 Cookie 只属于看看自己，不交给 ttyd 或开发网页。
+    // 访问码 Cookie 只属于 Look 自己，不交给 ttyd 或开发网页。
     strip_cookie(h, super::access::COOKIE);
     if ws {
         h.insert(header::CONNECTION, HeaderValue::from_static("upgrade"));
@@ -214,7 +214,7 @@ pub async fn tunnel(app: &App, mut req: Request, p: &Remote, proto: &str) -> Res
     let Some(port) = p.port.filter(|port| *port != 0) else {
         return StatusCode::BAD_REQUEST.into_response();
     };
-    // 不能借本机网页访问看看自己的入口和终端服务。
+    // 不能借本机网页访问 Look 自己的入口和终端服务。
     if port == app.ui_addr.port() || port == app.relay_addr.port() || Instances::is_reserved_port(port) {
         return assets::message_page(StatusCode::FORBIDDEN, "port_reserved");
     }

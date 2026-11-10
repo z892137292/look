@@ -1,5 +1,5 @@
 // 问题与日志：客户端把 WARN / ERROR 日志和页面脚本错误记下来，这里查看；“报告问题”把描述连同（可选的）
-// 运行信息、错误记录和运行日志发给看看服务端，发送前可以预览全部内容。没登录时可以下载成文件。
+// 运行信息、错误记录和运行日志发给 Look 服务端，发送前可以预览全部内容。没登录时可以下载成文件。
 import { Bug, Check, Download, Send, Trash2 } from 'lucide-react';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';

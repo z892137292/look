@@ -1,6 +1,6 @@
-// 以前的对话：电脑上 Claude Code、Codex、OpenCode 自己存的对话（客户端 src/history.rs），点一下在看看里接着聊。
+// 以前的对话：电脑上 Claude Code、Codex、OpenCode 自己存的对话（客户端 src/history.rs），点一下在 Look 里接着聊。
 // “所有以前的对话”页面（/history）；侧栏、项目页、草稿页里的也从这里接着聊。
-// 点一行先展开看最后几句，再点“继续”；正开在看看会话里的直接打开那个会话；
+// 点一行先展开看最后几句，再点“继续”；正开在 Look 会话里的直接打开那个会话；
 // 可能正开在别处（文件两分钟内还在变）的默认“复制一份继续”，原来那份不动。
 import { AlertCircle, ChevronDown, Copy, ExternalLink, Eye, EyeOff, Folder, GitBranch, Play, Search, SlidersHorizontal, Star, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -63,7 +63,7 @@ function ConvPeek({ device, conv, onHide, hidden }) {
   );
 }
 
-/** 继续 / 复制一份继续 / 打开已在看看里的会话，可能正开在别处时先提示。 */
+/** 继续 / 复制一份继续 / 打开已在 Look 里的会话，可能正开在别处时先提示。 */
 function ConvPeekActions({ device, conv, onHide, hidden }) {
   const { t } = useTranslation();
   const ui = useSessionUi();

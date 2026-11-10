@@ -6,7 +6,7 @@ Thanks for helping out. Bug reports, feature ideas and pull requests are all wel
 
 ## Reporting bugs and asking for features
 
-- **Bugs:** open an issue with the bug template. Include your OS, the Looklook version (Settings page or `looklook --version`), and which agent or command you were running.
+- **Bugs:** open an issue with the bug template. Include your OS, the Look version (Settings page or `looklook --version`), and which agent or command you were running.
 - **Features:** open an issue with the feature template, or 👍 an existing one.
 - **Security problems:** don't open a public issue. See [SECURITY.md](SECURITY.md).
 

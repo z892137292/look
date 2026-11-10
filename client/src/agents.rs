@@ -1,4 +1,4 @@
-//! 一键把看看的 MCP 接口和配套技能装进 Codex / Claude Code / OpenCode / DSH（DeepSeek Harness）。
+//! 一键把 Look 的 MCP 接口和配套技能装进 Codex / Claude Code / OpenCode / DSH（DeepSeek Harness）。
 //!
 //! - **Claude Code**：用它自己的命令 `claude mcp add --scope user`（`~/.claude.json` 由它自己维护，
 //!   别的会话随时在改，不直接写）；状态从 `~/.claude.json` 里读。设置了 `CLAUDE_CONFIG_DIR` 时跟着它走。
@@ -479,7 +479,7 @@ fn opencode_edit(raw: &str, entry: Option<(&str, &str)>) -> anyhow::Result<Optio
     Ok(Some(serde_json::to_string_pretty(&doc)? + "\n"))
 }
 
-const DSH_BEGIN: &str = "# >>> looklook (managed by Looklook; changes inside are overwritten) >>>";
+const DSH_BEGIN: &str = "# >>> looklook (managed by Look; changes inside are overwritten) >>>";
 const DSH_END: &str = "# <<< looklook <<<";
 
 /// 找到我们写的一段（含首尾标记行）。
@@ -535,14 +535,14 @@ fn dsh_edit(raw: &str, entry: Option<(&str, &str)>) -> anyhow::Result<Option<Str
 // ---------------- DSH 网页界面插件 ----------------
 //
 // DSH 的网页界面要用启动口令登录，口令每个进程一个、只打印在启动它的终端里（DSH 桌面版连打印都不打印）。
-// 看看自带一个很小的 DSH 插件（src/dsh-web-url.mjs）：它在 DSH 进程里调用官方的 `connection.authenticatedUrl()`，
-// 把带口令的地址写到 `$DSH_HOME/looklook/web-{pid}.json`。这样不管 DSH 是谁启动的、在哪个端口上，看看都能登录，
+// Look 自带一个很小的 DSH 插件（src/dsh-web-url.mjs）：它在 DSH 进程里调用官方的 `connection.authenticatedUrl()`，
+// 把带口令的地址写到 `$DSH_HOME/looklook/web-{pid}.json`。这样不管 DSH 是谁启动的、在哪个端口上，Look 都能登录，
 // 不用自己再起一个。插件放在 `$DSH_HOME/looklook/`，home 层补丁里另有一段（和 MCP 那一段分开）引用它的 file:// 地址，
 // 不用 pnpm 安装；DSH 会监视补丁文件，正在运行的 DSH 几秒内就会加载。用户看不到这些，坏了也只是退回旧办法。
 
 const DSH_WEB_PLUGIN: &str = include_str!("dsh-web-url.mjs");
 const DSH_WEB_PLUGIN_FILE: &str = "web-url.mjs";
-const DSH_WEB_BEGIN: &str = "# >>> looklook web (managed by Looklook; changes inside are overwritten) >>>";
+const DSH_WEB_BEGIN: &str = "# >>> looklook web (managed by Look; changes inside are overwritten) >>>";
 const DSH_WEB_END: &str = "# <<< looklook web <<<";
 
 /// `$DSH_HOME/looklook`：插件和它写的地址文件都在这里
@@ -550,7 +550,7 @@ fn dsh_web_dir() -> PathBuf {
     Agent::Dsh.dir().join("looklook")
 }
 
-/// 装好插件（新版看看带来的插件内容不同时更新）。`create` 为假且 DSH 从没运行过（没有 `$DSH_HOME`）时不装。
+/// 装好插件（新版 Look 带来的插件内容不同时更新）。`create` 为假且 DSH 从没运行过（没有 `$DSH_HOME`）时不装。
 /// 返回有没有改动。
 pub fn ensure_dsh_web_plugin(create: bool) -> anyhow::Result<bool> {
     if !create && !Agent::Dsh.dir().is_dir() {

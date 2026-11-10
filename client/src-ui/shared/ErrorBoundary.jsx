@@ -10,7 +10,7 @@ export function reportUiError(message, detail) {
   lastUiError = key;
   fetch('/api/diag/ui-error', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Looklook-Client': '1' },
+    headers: { 'Content-Type': 'application/json', 'X-Look-Client': '1' },
     body: JSON.stringify({ message: String(message).slice(0, 1000), detail: `${location.pathname} ${detail ?? ''}`.slice(0, 4000) }),
   }).catch(() => {});
 }

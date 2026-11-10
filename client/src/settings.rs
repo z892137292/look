@@ -30,7 +30,7 @@ pub struct Settings {
     /// 换成现在的默认一次，之后用户自己再选 `dark` / `agent` / `lagoon` 也会保留。字段自己的 serde 默认是 0（不是 Settings::default 里的值）。
     #[serde(default)]
     pub theme_rev: u8,
-    /// 在看看服务端显示的电脑名称；为空时用主机名
+    /// 在 Look 服务端显示的电脑名称；为空时用主机名
     pub device_name: String,
     /// 新建终端默认使用的 shell（写法见 shells.rs）；为空时自动选择
     pub default_shell: String,

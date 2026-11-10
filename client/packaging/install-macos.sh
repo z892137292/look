@@ -1,7 +1,7 @@
 #!/bin/sh
-# 安装看看客户端（macOS，Apple 芯片）。
+# 安装 Look 客户端（macOS，Apple 芯片）。
 #
-# 安装到 ~/Applications/Looklook，登录系统后自动运行（LaunchAgent），然后在浏览器打开管理台。
+# 安装到 ~/Applications/Look，登录系统后自动运行（LaunchAgent），然后在浏览器打开管理台。
 # 安装包没有 Apple 签名：这里会移除下载时加上的“隔离”标记，否则系统会拦截运行。
 #
 # 运行起来后菜单栏（右上角）会有一个托盘图标（详细设计任务 7b），右键可以打开管理台、
@@ -9,7 +9,7 @@
 # Label：com.looklook.client），不会跟安装时装的自启动产生冲突，见 docs/FAQ.md。
 set -eu
 SRC=$(cd "$(dirname "$0")" && pwd)
-APP="$HOME/Applications/Looklook"
+APP="$HOME/Applications/Look"
 LABEL=com.looklook.client
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 
@@ -19,7 +19,7 @@ mkdir -p "$APP" "$HOME/Library/LaunchAgents"
 rm -rf "$APP/fonts"
 # 终端服务以前叫 ttyd，现在是 looklook-term：删掉旧文件（还在运行的旧进程由新版启动时清理）
 rm -f "$APP/ttyd"
-# 压缩包里这些可能是指向 Looklook.app 的符号链接（scripts/package.sh）：-L 复制真文件
+# 压缩包里这些可能是指向 Look.app 的符号链接（scripts/package.sh）：-L 复制真文件
 cp -RL "$SRC/looklook" "$SRC/looklook-term" "$SRC/fonts" "$SRC/LICENSES" "$APP/"
 # 会话保持程序可能正被后台任务使用：先写临时文件再改名替换，不打断正在运行的任务。
 cp "$SRC/looklook-mux" "$APP/looklook-mux.new" && chmod 0755 "$APP/looklook-mux.new" && mv -f "$APP/looklook-mux.new" "$APP/looklook-mux"
@@ -61,8 +61,8 @@ else
   "$APP/looklook" open || true
 fi
 echo ""
-echo "✓ 看看客户端已安装，并会在每次登录 Mac 后自动运行。"
-echo "✓ Looklook client installed; it starts every time you log in to your Mac."
+echo "✓ Look 客户端已安装，并会在每次登录 Mac 后自动运行。"
+echo "✓ Look client installed; it starts every time you log in to your Mac."
 echo ""
 echo "  $APP/looklook open     打开管理台 / Open the console"
 echo "  $APP/looklook upgrade  升级到最新版本 / Upgrade to the latest version"

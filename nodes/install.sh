@@ -1,11 +1,11 @@
 #!/bin/bash
-# 一键安装 Looklook + 节点（mihomo 全局代理）。用法（在要装的机器上，用普通用户执行）：
+# 一键安装 Look + 节点（mihomo 全局代理）。用法（在要装的机器上，用普通用户执行）：
 #
 #   curl -fsSL https://github.com/z892137292/look/releases/latest/download/install.sh | sudo bash
 #
 # 参数（放在 bash 后面：… | sudo bash -s -- --kill-switch）：
 #   --kill-switch   没有可用节点时断网（默认关：没有节点时直接连网）
-#   --user 名字     Looklook 装给哪个用户（默认执行 sudo 的用户）
+#   --user 名字     Look 装给哪个用户（默认执行 sudo 的用户）
 #   --no-looklook   只装 mihomo 和节点服务
 # 环境变量 GH_PROXY：GitHub 下载慢时加个镜像前缀，例如 GH_PROXY=https://ghfast.top/
 set -euo pipefail

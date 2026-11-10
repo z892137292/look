@@ -10,14 +10,14 @@ body:
       required: true
   - type: input
     attributes:
-      label: Looklook version / 版本
+      label: Look version / 版本
       description: Settings page, or `looklook --version`
       placeholder: "1.45.0"
     validations:
       required: true
   - type: dropdown
     attributes:
-      label: OS of the computer running Looklook / 运行看看的电脑系统
+      label: OS of the computer running Look / 运行 Look 的电脑系统
       options: [Linux, macOS, Windows, Docker / other]
     validations:
       required: true

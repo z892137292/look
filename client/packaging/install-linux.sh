@@ -1,5 +1,5 @@
 #!/bin/sh
-# 安装看看客户端（Linux）。
+# 安装 Look 客户端（Linux）。
 #
 # 默认安装给当前用户（不需要 root）：程序在 ~/.local/lib/looklook，命令 ~/.local/bin/looklook，
 # 用 systemd 用户服务开机自动运行。终端里的命令以当前用户身份运行。
@@ -69,7 +69,7 @@ LAN_ON=0
 if [ "$CONTAINER" != 1 ] && [ "$("$PREFIX/looklook" access lan on --initial 2>/dev/null)" = enabled ]; then LAN_ON=1; fi
 
 UNIT='[Unit]
-Description=看看客户端（Looklook）
+Description=Look 客户端（Look）
 After=network-online.target
 Wants=network-online.target
 
@@ -77,7 +77,7 @@ Wants=network-online.target
 ExecStart=__EXEC__ run --no-browser
 Restart=on-failure
 RestartSec=5
-# 只结束看看本身；终端里的会话（looklook-mux）（以及其中的任务）在重启、升级时继续运行。
+# 只结束 Look 本身；终端里的会话（looklook-mux）（以及其中的任务）在重启、升级时继续运行。
 KillMode=process
 __USER__
 [Install]
@@ -101,7 +101,7 @@ elif [ $SYSTEMD = 1 ]; then
     [ $START = 1 ] && { systemctl --user restart looklook.service || say "启动失败，请查看 / Failed to start, see: journalctl --user -u looklook"; }
     # 让服务在没有登录桌面/SSH 时也运行（服务器开机即可远程使用）。
     if ! loginctl show-user "$(id -un)" -p Linger 2>/dev/null | grep -q yes; then
-      loginctl enable-linger "$(id -un)" 2>/dev/null || { say "提示：运行 sudo loginctl enable-linger $(id -un) 可以让看看在你没有登录时也保持运行。"; say "Tip: run sudo loginctl enable-linger $(id -un) to keep Looklook running while you're logged out."; }
+      loginctl enable-linger "$(id -un)" 2>/dev/null || { say "提示：运行 sudo loginctl enable-linger $(id -un) 可以让 Look 在你没有登录时也保持运行。"; say "Tip: run sudo loginctl enable-linger $(id -un) to keep Look running while you're logged out."; }
     fi
   else
     say "没有可用的 systemd 用户服务，请手动启动 / No systemd user service; start it yourself:"
@@ -126,13 +126,13 @@ if [ -n "${LOOKLOOK_INSTALL_KEY:-}" ] && [ $START = 1 ]; then
 fi
 
 # Docker 主机上的一键安装自己给出后续命令
-if [ "$CONTAINER" = 1 ]; then say "✓ 看看客户端已安装 / Looklook client installed"; exit 0; fi
+if [ "$CONTAINER" = 1 ]; then say "✓ Look 客户端已安装 / Look client installed"; exit 0; fi
 
 # 在 PATH 里就直接写 looklook，否则写完整路径（复制就能运行）
 LL=looklook
 case ":$PATH:" in *":$BIN:"*) ;; *) LL=$BIN/looklook; say "提示：把 $BIN 加入 PATH 后可以直接使用 looklook 命令 / Tip: add $BIN to PATH to run looklook directly." ;; esac
 say ""
-say "✓ 看看客户端已安装，这台电脑上和同一 Wi‑Fi 里不用登录就能用 / Looklook client installed. It works on this computer and the same Wi‑Fi without signing in"
+say "✓ Look 客户端已安装，这台电脑上和同一 Wi‑Fi 里不用登录就能用 / Look client installed. It works on this computer and the same Wi‑Fi without signing in"
 say ""
 cmd() { printf '  %s %-8s %s\n' "$LL" "$1" "$2"; }
 cmd login "开通远程访问，出门在外也能用手机打开（新用户注册送一年）/ Turn on remote access to open it from your phone anywhere (first year free)"

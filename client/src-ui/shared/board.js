@@ -118,7 +118,7 @@ export function useSeenPing(id, on) {
   }, [id, on]);
 }
 
-// “你离开期间”（docs/PLAN_2026-10-27.md §2.3）：上次看看板是什么时候，存在这个浏览器里（本机优先，不同步）
+// “你离开期间”（docs/PLAN_2026-10-27.md §2.3）：上次 Look 板是什么时候，存在这个浏览器里（本机优先，不同步）
 const AWAY_KEY = 'looklook.board.left_at';
 /** 离开多久才算“离开过”（毫秒） */
 export const AWAY_MIN = 30 * 60 * 1000;
@@ -139,13 +139,13 @@ function writeLeft(at) {
   }
 }
 
-// 这次回来之前离开的时间：打开看看或切回来时读一次
+// 这次回来之前离开的时间：打开 Look 或切回来时读一次
 let awaySince = readLeft();
 // 这次回来的摘要已经关掉了
 let awayDismissed = 0;
 
 /**
- * 在整个界面里挂一次：看着看看时每分钟记一次“现在”，切走时也记；切回来时先读出上次离开的时间。
+ * 在整个界面里挂一次：看着 Look 时每分钟记一次“现在”，切走时也记；切回来时先读出上次离开的时间。
  * 看板据此显示“你离开期间”。
  */
 export function useAwayTracker() {

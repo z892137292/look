@@ -22,8 +22,8 @@ function speed(ms) {
 }
 
 /**
- * 让远程直连的代理规则（Clash / mihomo 格式）：先放行看看进程的全部 UDP（WebRTC 直连、STUN / TURN，发往对端的地址
- * 事先不知道，只能按进程放行；只放 UDP，连看看服务器的 HTTPS 照旧），再放行线路（UDP 不通时经 TCP 连）：
+ * 让远程直连的代理规则（Clash / mihomo 格式）：先放行 Look 进程的全部 UDP（WebRTC 直连、STUN / TURN，发往对端的地址
+ * 事先不知道，只能按进程放行；只放 UDP，连 Look 服务器的 HTTPS 照旧），再放行线路（UDP 不通时经 TCP 连）：
  * 线路是域名就放行它的上级域名（r3.looklook.dev → looklook.dev），是 IP 就放行这个 IP。`os` 是这台电脑的系统。
  */
 export function directRules(items, os) {

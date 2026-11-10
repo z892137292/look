@@ -874,10 +874,10 @@ pub fn restart_now() -> ! {
                 cmd.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
             }
             if let Err(e) = cmd.spawn() {
-                tracing::error!(error = %e, "无法启动新版本，请手动启动看看");
+                tracing::error!(error = %e, "无法启动新版本，请手动启动 Look");
             }
         }
-        None => tracing::error!("找不到程序路径，请手动启动看看"),
+        None => tracing::error!("找不到程序路径，请手动启动 Look"),
     }
     crate::util::exit_now(0);
 }
@@ -983,12 +983,12 @@ mod tests {
         assert_eq!(std::fs::read_to_string(tmp.path().join("out/looklook/looklook")).unwrap(), "bin");
     }
 
-    /// macOS 压缩包里 looklook/ 的随包文件是指向 Looklook.app 的链接（scripts/package.sh）：替换文件时复制真文件。
+    /// macOS 压缩包里 looklook/ 的随包文件是指向 Look.app 的链接（scripts/package.sh）：替换文件时复制真文件。
     #[cfg(unix)]
     #[test]
     fn apply_follows_links_into_bundle() {
         let tmp = tempfile::tempdir().unwrap();
-        let res = tmp.path().join("pkg/Looklook.app/Contents/Resources");
+        let res = tmp.path().join("pkg/Look.app/Contents/Resources");
         std::fs::create_dir_all(res.join("fonts")).unwrap();
         std::fs::write(res.join("fonts/a.woff2"), "font").unwrap();
         std::fs::write(res.join(crate::paths::TERM_EXE), "term").unwrap();
@@ -996,7 +996,7 @@ mod tests {
         std::fs::create_dir_all(&src).unwrap();
         std::fs::write(src.join("looklook"), "bin").unwrap();
         for n in ["fonts", crate::paths::TERM_EXE] {
-            std::os::unix::fs::symlink(format!("../Looklook.app/Contents/Resources/{n}"), src.join(n)).unwrap();
+            std::os::unix::fs::symlink(format!("../Look.app/Contents/Resources/{n}"), src.join(n)).unwrap();
         }
         assert!(src.join(crate::paths::TERM_EXE).is_file());
         let dir = tmp.path().join("app");
@@ -1012,14 +1012,14 @@ mod tests {
     #[test]
     fn replace_bundle_failure_keeps_new_bundle() {
         let tmp = tempfile::tempdir().unwrap();
-        let app = tmp.path().join("staged/Looklook.app");
+        let app = tmp.path().join("staged/Look.app");
         std::fs::create_dir_all(app.join("Contents")).unwrap();
         std::fs::write(app.join("Contents/x"), "new").unwrap();
         // 旧应用包不存在：把它改名备份这一步失败
-        let root = tmp.path().join("Applications/Looklook.app");
+        let root = tmp.path().join("Applications/Look.app");
         std::fs::create_dir_all(root.parent().unwrap()).unwrap();
         assert!(replace_bundle(&app, &root).is_err());
         assert_eq!(std::fs::read_to_string(app.join("Contents/x")).unwrap(), "new");
-        assert!(!tmp.path().join("Applications/.Looklook.app.new").exists());
+        assert!(!tmp.path().join("Applications/.Look.app.new").exists());
     }
 }

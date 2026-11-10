@@ -97,7 +97,7 @@ pub trait Agent: Send + Sync {
     fn process_names(&self) -> &'static [&'static str] {
         &[]
     }
-    /// 这个进程（命令行参数）是不是带着看看的 hooks 启动的；看不出来时 None
+    /// 这个进程（命令行参数）是不是带着 Look 的 hooks 启动的；看不出来时 None
     fn launched_with_hooks(&self, _args: &[String]) -> Option<bool> {
         None
     }
@@ -178,7 +178,7 @@ impl Agent for Claude {
                 json!({ "behavior": "allow", "updatedPermissions": dirs })
             }
             "deny" => {
-                let msg = req.message.as_deref().map(str::trim).filter(|m| !m.is_empty()).unwrap_or("The user denied this in the Looklook chat view.");
+                let msg = req.message.as_deref().map(str::trim).filter(|m| !m.is_empty()).unwrap_or("The user denied this in the Look chat view.");
                 json!({ "behavior": "deny", "message": msg.chars().take(2000).collect::<String>() })
             }
             "answer" if kind == "question" => {

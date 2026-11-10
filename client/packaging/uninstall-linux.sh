@@ -1,10 +1,10 @@
 #!/bin/sh
-# 卸载看看客户端（保留数据目录里的登录信息和设置；终端里正在运行的任务不受影响）。
+# 卸载 Look 客户端（保留数据目录里的登录信息和设置；终端里正在运行的任务不受影响）。
 # 数据目录里的程序（versions/、bin/，自动更新装的版本）一起删掉：它们是程序，不是用户数据。
 set -eu
 if [ "$(id -u)" = 0 ]; then PREFIX=${LOOKLOOK_PREFIX:-/opt/looklook}; else PREFIX=${LOOKLOOK_PREFIX:-$HOME/.local/lib/looklook}; fi
 if [ -n "${LOOKLOOK_HOME:-}" ]; then DATA=$LOOKLOOK_HOME; else DATA=${XDG_DATA_HOME:-$HOME/.local/share}/looklook; fi
-# 没有 systemd 时（Docker 容器等）手动启动的看看也结束掉（包括从数据目录里的版本运行的）
+# 没有 systemd 时（Docker 容器等）手动启动的 Look 也结束掉（包括从数据目录里的版本运行的）
 STOP=$PREFIX/stop.sh
 [ -f "$STOP" ] || STOP=$DATA/bin/stop.sh
 [ -f "$STOP" ] && sh "$STOP" "$PREFIX" 2>/dev/null || true

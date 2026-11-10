@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -I
-# lk-nodes：Looklook「节点」页的 root 小服务（只听 127.0.0.1:9091），管理本机的 mihomo（lk-mihomo.service）。
+# lk-nodes：Look「节点」页的 root 小服务（只听 127.0.0.1:9091），管理本机的 mihomo（lk-mihomo.service）。
 #
 # - mihomo 配置由这里生成（/var/lib/lk-nodes/config.yaml），全局代理：除局域网外都走 GLOBAL-OUT。
 # - 节点来源：手动粘贴的链接（local.yaml）+ 订阅地址（mihomo 自己定时拉取）。

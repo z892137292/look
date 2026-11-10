@@ -10,6 +10,6 @@ This work is a modified version of the Looklook client 1.57.1 by imythu, license
 - 平台地址解析到本机，关闭自动检查更新，移除推广和更新提示：不再连接原项目的托管服务
 - 手机端：输入框不被底部导航遮挡、iOS 输入不缩放等
 - 修复：聊天图片缩略图 404、聊天滚动卡顿和残影、旧会话恢复失败
-- 更换产品名和图标：「Looklook / 看看」的名称和标志不随代码授权给分叉（界面文案和程序内部的原名称尚未全部替换）
+- 更换产品名和图标：「Looklook / 看看」的名称和标志不随代码授权给分叉。界面文案已改为 Look；为了兼容已有安装，程序内部的小写标识（命令和程序名 `looklook`、安装目录、环境变量 `LOOKLOOK_*` 等）暂未改名
 
 `nodes/` 捆绑的 mihomo（GPL-3.0）及其他第三方组件各按原许可证授权，见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

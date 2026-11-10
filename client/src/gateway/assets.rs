@@ -28,7 +28,7 @@ pub async fn ui(uri: Uri) -> Response {
     }
 }
 
-/// 终端页（`/i/{id}/` 的首页）：看看自己的前端（term.html，src-term/），代替 ttyd 内嵌的页面，同样插入终端字体与辅助脚本。
+/// 终端页（`/i/{id}/` 的首页）：Look 自己的前端（term.html，src-term/），代替 ttyd 内嵌的页面，同样插入终端字体与辅助脚本。
 /// 构建产物里没有时（没执行过 npm run build）返回 None，仍用 ttyd 的页面。
 pub fn term_page() -> Option<Response> {
     let f = Ui::get("term.html")?;
@@ -65,15 +65,15 @@ pub async fn font(State(app): State<App>, Path(path): Path<String>) -> Response 
 
 fn text(kind: &str) -> (&'static str, &'static str) {
     match kind {
-        "locked" => ("远程访问暂时用不了", "在这台电脑上打开看看，可以看到原因。电脑上一切照常，正在跑的任务也不受影响。"),
+        "locked" => ("远程访问暂时用不了", "在这台电脑上打开 Look，可以看到原因。电脑上一切照常，正在跑的任务也不受影响。"),
         "locked_expired" => (
             "会员已到期，远程访问暂停了",
-            "在这台电脑上打开看看 → 会员与邀请，兑换续期码或邀请朋友注册，延长会员后马上就能从外面打开。电脑上一切照常，正在跑的任务也不受影响。",
+            "在这台电脑上打开 Look → 会员与邀请，兑换续期码或邀请朋友注册，延长会员后马上就能从外面打开。电脑上一切照常，正在跑的任务也不受影响。",
         ),
-        "locked_offline" => ("电脑太久没连上看看服务器，远程访问暂停了", "这台电脑恢复联网后会自动恢复。正在跑的任务不受影响。"),
-        "not_running" => ("这个终端还没有启动", "请回到看看客户端，在终端列表里点“启动”。"),
-        "upstream_down" => ("终端暂时没有响应", "请稍后刷新；如果一直这样，可以在看看客户端里重启这个终端。"),
-        "port_reserved" => ("这个地址不能用作本机网页", "它是看看自己在使用的端口，请换一个网页地址。"),
+        "locked_offline" => ("电脑太久没连上 Look 服务器，远程访问暂停了", "这台电脑恢复联网后会自动恢复。正在跑的任务不受影响。"),
+        "not_running" => ("这个终端还没有启动", "请回到 Look 客户端，在终端列表里点“启动”。"),
+        "upstream_down" => ("终端暂时没有响应", "请稍后刷新；如果一直这样，可以在 Look 客户端里重启这个终端。"),
+        "port_reserved" => ("这个地址不能用作本机网页", "它是 Look 自己在使用的端口，请换一个网页地址。"),
         "page_down" => ("电脑上的这个网页没有在运行", "请先在电脑上启动它（比如运行 npm run dev），再刷新本页。"),
         _ => ("出了点问题", "请稍后再试。"),
     }
@@ -121,12 +121,12 @@ pub fn denied_page(ip: &str) -> Response {
         "不能从这台设备打开 / Not allowed",
         &format!(
             "<h1>不能从这台设备打开</h1>\
-             <p>看看默认只允许装着它的那台电脑自己打开管理台。这台设备的 IP 是 <code>{ip}</code>。</p>\
-             <p>如果这是你自己的设备：在装看看的电脑上打开“设置 → 访问控制”，开启“允许局域网访问”，或把这个 IP 加入白名单；\
+             <p>Look 默认只允许装着它的那台电脑自己打开管理台。这台设备的 IP 是 <code>{ip}</code>。</p>\
+             <p>如果这是你自己的设备：在装 Look 的电脑上打开“设置 → 访问控制”，开启“允许局域网访问”，或把这个 IP 加入白名单；\
              没有屏幕的机器（如 NAS）可以运行 <code>looklook access lan on</code>。</p>\
              <p>不在家时，请用你的专属地址打开。</p>\
-             <p class=\"d\">This device ({ip}) is not allowed to open the Looklook console directly. \
-             Allow LAN access or add this IP in Settings → Access on the computer running Looklook.</p>"
+             <p class=\"d\">This device ({ip}) is not allowed to open the Look console directly. \
+             Allow LAN access or add this IP in Settings → Access on the computer running Look.</p>"
         ),
     )
 }
@@ -144,7 +144,7 @@ pub fn code_page(next: &str, error: Option<&str>) -> Response {
         "输入访问码 / Access code",
         &format!(
             "<h1>输入访问码</h1>\
-             <p>这台电脑上的看看开启了访问码。访问码在那台电脑的“设置 → 访问控制”里，或运行 <code>looklook access</code> 查看。不区分大小写。</p>\
+             <p>这台电脑上的 Look 开启了访问码。访问码在那台电脑的“设置 → 访问控制”里，或运行 <code>looklook access</code> 查看。不区分大小写。</p>\
              {err}<form method=\"post\" action=\"{action}\"><input type=\"hidden\" name=\"next\" value=\"{next}\">\
              <input name=\"code\" autocomplete=\"off\" autocapitalize=\"characters\" spellcheck=\"false\" autofocus required aria-label=\"访问码\" placeholder=\"XXXX-XXXX-XXXX\">\
              <button type=\"submit\">进入</button></form>",

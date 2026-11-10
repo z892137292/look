@@ -1,6 +1,6 @@
 // 设置 → Claude Code 账号、Codex 配置：本机默认、（Claude Code）另外登录的官方账号、第三方接口，选一个当默认。
 // 新建的会话用默认的（开始页可以另选），之后切换默认不影响已经建好的会话。两个助手共用这里的组件，`agent` 区分。
-// 官方账号的登录由 Claude Code 自己完成（后台运行 `claude auth login`，界面显示授权页地址、收授权码），看看不经手令牌。
+// 官方账号的登录由 Claude Code 自己完成（后台运行 `claude auth login`，界面显示授权页地址、收授权码），Look 不经手令牌。
 // 第三方接口可以从“常见服务商”里选（model_presets.rs）：地址填好了，贴上 Key 就行，模型从 models.dev 的列表里选。
 import { Check, Cpu, ExternalLink, Gauge, KeyRound, LogIn, Plus, Server, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';

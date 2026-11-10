@@ -222,7 +222,7 @@ fn close_text(brief: &Value, en: bool) -> String {
     } else if brief["phase"] == "tui" {
         tr(en, "已转到终端", "Moved to the terminal")
     } else {
-        tr(en, "已在看看或终端里处理", "Handled in LookLook or the terminal")
+        tr(en, "已在 Look 或终端里处理", "Handled in Look or the terminal")
     }
 }
 
@@ -788,7 +788,7 @@ impl Notifier {
             return self.agent.stop(app, act, en).await;
         }
         let Some(sent) = self.card_by_nonce(&act.n).filter(|s| s.inst == act.inst) else {
-            return Ok((tr(en, "这张卡片已经过期了，打开看看处理", "This card has expired. Open LookLook instead."), None));
+            return Ok((tr(en, "这张卡片已经过期了，打开 Look 处理", "This card has expired. Open Look instead."), None));
         };
         self.set_busy(&sent.nonce, true);
         let r = self.act_on(app, act, text, &sent, en).await;
@@ -884,7 +884,7 @@ impl Notifier {
             return Some(crate::feishu_tools::on_card(app, &act, operator).await);
         }
         if !load_rules(&app.store).actions {
-            return Some(toast("info", &tr(en, "已设置为只通知，打开看看处理", "Notify-only mode. Open LookLook to respond.")));
+            return Some(toast("info", &tr(en, "已设置为只通知，打开 Look 处理", "Notify-only mode. Open Look to respond.")));
         }
         if crate::feishu_agent::handles(&act.a) {
             return Some(crate::feishu_agent::on_card(app, &act, ev, operator).await);
@@ -964,11 +964,11 @@ impl Notifier {
             }
             self.reset();
             tracing::info!("飞书：绑定了新的账号");
-            tr(en, "已绑定。看看的通知会发到这里。", "Bound. LookLook notifications will arrive here.")
+            tr(en, "已绑定。Look 的通知会发到这里。", "Bound. Look notifications will arrive here.")
         } else if text.len() == 6 && text.chars().all(|c| c.is_ascii_digit()) {
-            tr(en, "绑定码不对或已过期，请在看看的设置页里看最新的码。", "Wrong or expired code. Check the latest code in LookLook settings.")
+            tr(en, "绑定码不对或已过期，请在 Look 的设置页里看最新的码。", "Wrong or expired code. Check the latest code in Look settings.")
         } else {
-            tr(en, "请发送看看设置页里显示的 6 位绑定码。", "Send the 6-digit code shown in LookLook settings.")
+            tr(en, "请发送 Look 设置页里显示的 6 位绑定码。", "Send the 6-digit code shown in Look settings.")
         };
         if let Err(e) = api.send_text(open_id, &reply).await {
             self.record_err(&e);
@@ -1341,7 +1341,7 @@ mod tests {
         assert_eq!(close_text(&b(now, false), false), "已被新的请求替换");
         assert_eq!(close_text(&json!({ "board": "stopped" }), false), "会话已结束");
         assert_eq!(close_text(&json!({ "board": "idle", "phase": "tui" }), true), "Moved to the terminal");
-        assert_eq!(close_text(&json!({ "board": "working", "phase": "running" }), false), "已在看看或终端里处理");
+        assert_eq!(close_text(&json!({ "board": "working", "phase": "running" }), false), "已在 Look 或终端里处理");
     }
 
     #[test]

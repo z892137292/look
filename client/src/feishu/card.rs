@@ -178,7 +178,7 @@ pub fn attn(i: &Info, a: &Attn, base: &Act) -> Value {
                 els.push(if a.tool == "Bash" { code(a.detail) } else { div(a.detail) });
             }
             if let Some(rule) = a.guard {
-                els.push(note(&tr(i.en, &format!("命中了看看的命令规则：{rule}"), &format!("Matches a Looklook command rule: {rule}"))));
+                els.push(note(&tr(i.en, &format!("命中了 Look 的命令规则：{rule}"), &format!("Matches a Look command rule: {rule}"))));
             }
             if i.actions {
                 let confirm = high.then_some((if i.en { "Allow a high-risk action?" } else { "允许高风险操作？" }, if i.en { "This runs on your computer right away." } else { "允许后会马上在电脑上执行。" }));
@@ -264,10 +264,10 @@ pub fn said(i: &Info, text: &str) -> Value {
 /// 设置页“发一条测试”：点按钮能收到回调才算配好（漏了 `card.action.trigger` 时会报 200340）
 pub fn test(en: bool, act: &Act, ok: bool) -> Value {
     if ok {
-        let title = tr(en, "看看：按钮回调已接通", "LookLook: button callbacks work");
+        let title = tr(en, "Look：按钮回调已接通", "Look: button callbacks work");
         return card(header(&title, "", "green", None), &title, vec![div(&tr(en, "配置完成，之后的通知会发到这里。", "All set. Notifications will arrive here."))]);
     }
-    let title = tr(en, "看看：测试通知", "LookLook: test notification");
+    let title = tr(en, "Look：测试通知", "Look: test notification");
     card(
         header(&title, "", "blue", None),
         &title,
@@ -609,13 +609,13 @@ pub fn sessions(en: bool, rows: &[SessionRow], url: &str) -> Value {
 
 /// 菜单「任务」：一个打开任务页的链接
 pub fn tasks_link(en: bool, url: &str) -> Value {
-    let title = tr(en, "看看的任务页", "LookLook Tasks");
+    let title = tr(en, "Look 的任务页", "Look Tasks");
     card(header(&title, "", "blue", None), &title, vec![row(vec![link(&tr(en, "打开任务", "Open Tasks"), url)])])
 }
 
 /// 缺权限：在飞书里点链接确认就补上（`register::begin` 带着 App ID），补好后换成 [`granted`]
 pub fn grant(en: bool, why: &str, url: &str) -> Value {
-    let title = tr(en, "看看需要再开通一点权限", "LookLook needs a few more permissions");
+    let title = tr(en, "Look 需要再开通一点权限", "Look needs a few more permissions");
     card(
         header(&title, "", "orange", None),
         &title,
@@ -640,7 +640,7 @@ pub fn user_auth(en: bool, url: &str, minutes: u64) -> Value {
                 "电脑上的 AI 助手（Claude Code、Codex 等）要读群聊和单聊消息、下载里面的文件、找人、读云文档。以你的身份发消息时，每条都会先发卡片问你。",
                 "An AI assistant on your computer (Claude Code, Codex…) wants to read your group and direct messages, download their files, look people up and read docs. Every message it wants to send as you is confirmed with a card first.",
             )),
-            note(&tr(en, &format!("点“授权”，在飞书里同意（{minutes} 分钟内有效）。令牌只存在这台电脑上，可以在看看的设置 → 通知里撤销。"), &format!("Tap “Authorize” and approve in Feishu (valid for {minutes} minutes). The token stays on this computer; revoke it in LookLook Settings → Notifications."))),
+            note(&tr(en, &format!("点“授权”，在飞书里同意（{minutes} 分钟内有效）。令牌只存在这台电脑上，可以在 Look 的设置 → 通知里撤销。"), &format!("Tap “Authorize” and approve in Feishu (valid for {minutes} minutes). The token stays on this computer; revoke it in Look Settings → Notifications."))),
             row(vec![link(&tr(en, "授权", "Authorize"), url)]),
         ],
     )

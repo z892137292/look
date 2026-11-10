@@ -1,4 +1,4 @@
-//! 本机接口 `/api/*`（管理台使用）。写请求要求 `X-Looklook-Client: 1` 且 `Origin` 为本站，
+//! 本机接口 `/api/*`（管理台使用）。写请求要求 `X-Look-Client: 1` 且 `Origin` 为本站，
 //! 跨站页面既带不上自定义头（需要预检，本服务不响应 CORS），也伪造不了来源。
 
 use axum::extract::{DefaultBodyLimit, Path, Query, Request, State};
@@ -536,7 +536,7 @@ async fn create_dsh(app: &App, mut input: Input) -> R<crate::instances::View> {
     if app.instances.dsh()?.is_some() {
         return Err(LocalError::new("DSH_EXISTS"));
     }
-    // 已经有 DSH 在运行就记下它的端口（打开时用它）；没有就挑一个空闲的，留给看看自己启动时用
+    // 已经有 DSH 在运行就记下它的端口（打开时用它）；没有就挑一个空闲的，留给 Look 自己启动时用
     let _ = tokio::task::spawn_blocking(|| crate::agents::ensure_dsh_web_plugin(true)).await;
     let running = tokio::task::spawn_blocking(crate::agents::dsh_web_running).await.unwrap_or_default();
     input.web_port = Some(match running.first() {
@@ -549,7 +549,7 @@ async fn create_dsh(app: &App, mut input: Input) -> R<crate::instances::View> {
 #[derive(Deserialize, Default)]
 #[serde(default)]
 struct PageQ {
-    /// 桌面应用：由看看用系统浏览器打开（带着口令），不在应用窗口里打开
+    /// 桌面应用：由 Look 用系统浏览器打开（带着口令），不在应用窗口里打开
     open: bool,
 }
 
@@ -691,7 +691,7 @@ async fn instance_web(State(app): State<App>, Path(id): Path<String>) -> R<Json<
 }
 
 /// 旧版本给 DSH 建的本机网页映射现在用不着了（远程经管理台的通道打开）：在后台删掉，不耽误打开。
-/// 平台上已经没有了（用户自己删了）也算删掉；暂时连不上就等看看下次运行再删（每次运行只试一次）。
+/// 平台上已经没有了（用户自己删了）也算删掉；暂时连不上就等 Look 下次运行再删（每次运行只试一次）。
 pub(super) async fn drop_legacy_page(app: &App, id: &str) {
     static TRIED: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
     let Ok(Some(p)) = app.store.get::<DshPage>(&page_key(id)) else { return };
@@ -714,7 +714,7 @@ pub(super) async fn drop_legacy_page(app: &App, id: &str) {
     });
 }
 
-/// 等这个会话的终端里刚启动的 dsh 给出启动口令并登录上。口令有两个来源：看看的 DSH 插件写的地址文件
+/// 等这个会话的终端里刚启动的 dsh 给出启动口令并登录上。口令有两个来源：Look 的 DSH 插件写的地址文件
 /// （见 agents.rs），以及 dsh 打印的 `dsh web: http://127.0.0.1:P/?token=…` 这一行（插件没装上时靠它）。
 /// 用口令打开一次，DSH 就发一个 30 天的 Cookie（绑定 `127.0.0.1:P`，dsh 重启后照样有效）。
 /// 口令每次启动都换，而且 dsh 要等插件全部加载完才给出（第一次运行要初始化配置，会慢很多）。
@@ -1756,7 +1756,7 @@ async fn delete_page_share(State(app): State<App>, Path((id, share)): Path<(Stri
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// 平台只校验 1–65535；本机再拒绝看看自己在用的端口。
+/// 平台只校验 1–65535；本机再拒绝 Look 自己在用的端口。
 pub(super) fn check_tunnel_port(app: &App, port: Option<i64>) -> R<()> {
     let Some(p) = port else { return Ok(()) };
     let reserved = u16::try_from(p)
@@ -1859,7 +1859,7 @@ async fn git_remotes(Json(req): Json<RemotesReq>) -> R<Json<Value>> {
 
 // ---------------- 以前的对话（history.rs） ----------------
 
-/// 以前的对话。正开在某个看看会话里的标上 `instance_id`（界面上直接打开它，不再开第二个）：
+/// 以前的对话。正开在某个 Look 会话里的标上 `instance_id`（界面上直接打开它，不再开第二个）：
 /// 按这个会话接着的对话号，Claude Code 对话界面还按 hooks 记下的当前会话号。
 async fn list_history(State(app): State<App>, Query(q): Query<crate::history::Query>) -> R<Json<Value>> {
     let mut items = crate::history::list(q).await;
@@ -1871,7 +1871,7 @@ async fn list_history(State(app): State<App>, Query(q): Query<crate::history::Qu
     Ok(Json(json!({ "items": items, "marks": marks, "persistent": matches!(app.instances.backend, Backend::Tmux(_)) })))
 }
 
-/// 正开在看看会话里的对话：对话号 → 会话 ID。按这个会话接着的对话号、Claude Code 对话界面 hooks 记下的当前会话号，
+/// 正开在 Look 会话里的对话：对话号 → 会话 ID。按这个会话接着的对话号、Claude Code 对话界面 hooks 记下的当前会话号，
 /// 还有从记录里认出来的（[`crate::instances::View::conv_id`]）。
 fn open_convs(app: &App, views: &[crate::instances::View]) -> std::collections::HashMap<String, String> {
     let mut open = std::collections::HashMap::new();
@@ -2763,8 +2763,8 @@ mod tests {
         use crate::shells::Family;
         assert_eq!(super::ssh_launch_line("/usr/local/bin/looklook", "ab12", Family::Posix), "/usr/local/bin/looklook ssh ab12");
         assert_eq!(super::ssh_launch_line("/Users/o/My Apps/looklook", "ab12", Family::Posix), "'/Users/o/My Apps/looklook' ssh ab12");
-        assert_eq!(super::ssh_launch_line("C:\\Program Files\\Looklook\\looklook.exe", "ab12", Family::Pwsh), "& 'C:\\Program Files\\Looklook\\looklook.exe' ssh ab12");
-        assert_eq!(super::ssh_launch_line("C:\\Program Files\\Looklook\\looklook.exe", "ab12", Family::Cmd), "\"C:\\Program Files\\Looklook\\looklook.exe\" ssh ab12");
+        assert_eq!(super::ssh_launch_line("C:\\Program Files\\Look\\looklook.exe", "ab12", Family::Pwsh), "& 'C:\\Program Files\\Look\\looklook.exe' ssh ab12");
+        assert_eq!(super::ssh_launch_line("C:\\Program Files\\Look\\looklook.exe", "ab12", Family::Cmd), "\"C:\\Program Files\\Look\\looklook.exe\" ssh ab12");
     }
 
     use super::*;
