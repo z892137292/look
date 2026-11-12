@@ -6,7 +6,7 @@ This work is a modified version of the Looklook client 1.57.1 by imythu, license
 与原版的主要差异：
 
 - 新增「节点」页（`client/src-ui/pages/Nodes.jsx`）、网关转发（`client/src/gateway/mihomo.rs`）和安装脚本（`nodes/`）
-- 新增线路显示（局域网 / Tailscale / DERP，`client/src/gateway/ts_report.rs`）和内置浏览器页面（`client/src-ui/pages/Browser.jsx`）
+- 新增线路显示（局域网 / Tailscale / DERP，`client/src/gateway/ts_report.rs`）和内置浏览器页面（`client/src-ui/pages/Browser.jsx`，入口在会话栏顶上）
 - 平台地址解析到本机，关闭自动检查更新，移除推广和更新提示：不再连接原项目的托管服务
 - 手机端：输入框不被底部导航遮挡、iOS 输入不缩放等
 - 修复：聊天图片缩略图 404、聊天滚动卡顿和残影、旧会话恢复失败

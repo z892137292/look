@@ -4,7 +4,7 @@
 // 侧栏每个项目只列最近几个，其余在项目页（Project.jsx）。
 // 项目 = 某台电脑上的一个文件夹（见 shared/sessions.jsx）。电脑用颜色 + 系统图标区分（shared/brands.jsx）。
 // 电脑上会话在右边打开，最近打开的几个在后台保持连接；手机上整页打开 /t/{id}（有按键条）。
-import { AlertCircle, Check, ChevronDown, Container, Copy, X, ChevronsDownUp, ChevronsUpDown, EyeOff, Folder, FolderPlus, History, Laptop, Lightbulb, ListTree, Moon, Pin, PinOff, Play, Plus, Search, SlidersHorizontal, PanelLeftClose, Trash2 } from 'lucide-react';
+import { AlertCircle, Check, ChevronDown, Container, Copy, X, ChevronsDownUp, ChevronsUpDown, EyeOff, Folder, FolderPlus, Globe, History, Laptop, Lightbulb, ListTree, Moon, Pin, PinOff, Play, Plus, Search, SlidersHorizontal, PanelLeftClose, Trash2 } from 'lucide-react';
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -414,6 +414,22 @@ function DraftSideRow() {
   );
 }
 
+/** 本地改版：会话栏顶上的共享浏览器（pages/Browser.jsx，地址 /pages）。点开后会话栏还在，网页铺满右边。 */
+function WebSideRow({ current }) {
+  const { t } = useTranslation();
+  const { navigate } = useRouter();
+  return (
+    <div className={`srow sweb ${current ? 'current' : ''}`}>
+      <button type="button" className="srow-main" onClick={() => navigate('/pages')} aria-current={current ? 'page' : undefined}>
+        <Globe size={16} className="srow-icon" aria-hidden="true" />
+        <span className="srow-text">
+          <span className="ellipsis">{t('nav.pages')}</span>
+        </span>
+      </button>
+    </div>
+  );
+}
+
 /** 合并的项目在哪几台电脑上：每台一个颜色点（离线的是空心），后面写“2 台”，有离线的写“1 台在线”。 */
 function DeviceDots({ members }) {
   const { t } = useTranslation();
@@ -678,7 +694,7 @@ function StatusFilter({ value, onChange }) {
 }
 
 /** 项目和会话列表（电脑上的会话栏、手机首页共用）：标题、搜索、电脑和状态筛选，下面是等你处理、项目。 */
-export function SessionList({ currentId, onCollapse }) {
+export function SessionList({ currentId, webActive = false, onCollapse }) {
   const links = useLinks();
   const { t } = useTranslation();
   const { navigate } = useRouter();
@@ -914,6 +930,7 @@ export function SessionList({ currentId, onCollapse }) {
         )}
       </div>
       <div className="slist-body">
+        <WebSideRow current={webActive} />
         {s.error && <ErrorNote error={s.error} />}
         <SessionTips attn={attn.length > 0} />
         {attn.length > 0 && groupBy !== 'recent' && (

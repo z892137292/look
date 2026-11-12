@@ -4,7 +4,7 @@
 // 本机 App 和浏览器远程打开是同一个界面，差别只在顶栏的连接胶囊（ConnChip）。
 // 首页 / 是开始页（手机上是会话列表），/s/{id} 在右边打开会话；整页终端 /t/{id} 占满整个窗口（手机、新窗口）。
 // 界面不出现“ttyd、tmux、隧道、端口转发”等术语。
-import { Activity, Bot, CalendarClock, Compass, FolderOpen, Globe, History, Keyboard, Languages, Laptop, Link2, Network, ListTodo, LogOut, MessageSquare, Plus, Server, Settings as SettingsIcon, ShieldCheck, UserRound, Wrench } from 'lucide-react';
+import { Activity, Bot, CalendarClock, Compass, FolderOpen, History, Keyboard, Languages, Laptop, Link2, Network, ListTodo, LogOut, MessageSquare, Plus, Server, Settings as SettingsIcon, ShieldCheck, UserRound, Wrench } from 'lucide-react';
 import { createContext, Fragment, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -94,7 +94,6 @@ export function SafetyNote({ full = false }) {
 const TOOLS = [
   { to: '/files', icon: FolderOpen, key: 'nav.files' },
   { to: '/ssh', icon: Server, key: 'nav.ssh' },
-  { to: '/pages', icon: Globe, key: 'nav.pages' }, // 本地改版：本机网页 → 共享浏览器（pages/Browser.jsx）
   { to: '/nodes', icon: Network, key: 'nav.nodes' }, // 本地改版：代理节点（pages/Nodes.jsx）
   { to: '/ai', icon: Bot, key: 'nav.ai' },
   { to: '/system', icon: Activity, key: 'nav.system', meta: 'cpu' },
@@ -109,12 +108,14 @@ const ACCOUNT_PAGES = ['/devices', '/membership', '/account'];
 // 从右边滑出来的抽屉（地址照旧，链接、刷新都能直接打开）：盖在会话上面，不换掉它。文件、SSH 这类要干活的工具还是整页
 const DRAWER_PAGES = { '/settings': 'nav.settings', '/devices': 'acct.computers', '/account': 'acct.account', '/membership': 'acct.membership' };
 const isDrawer = (p) => Object.hasOwn(DRAWER_PAGES, p);
-const PAGES = ['/', '/new', '/tasks', '/history', '/project', ...ACCOUNT_PAGES, ...TOOLS.map((x) => x.to)];
+// 本地改版：共享浏览器（pages/Browser.jsx，地址 /pages）不在工具里，放在会话栏顶上，打开时会话栏不收、画面铺满右边
+const WEB = '/pages';
+const PAGES = ['/', '/new', '/tasks', '/history', '/project', WEB, ...ACCOUNT_PAGES, ...TOOLS.map((x) => x.to)];
 // 开源仓库（客户端 AGPL-3.0-or-later）
 export const SOURCE_URL = 'https://github.com/z892137292/look';
 const isKnown = (p) => PAGES.includes(p) || TERM.test(p) || SESS.test(p);
 // 会话相关的页面铺满主区域（不限宽度）
-const isWide = (p) => p === '/' || p === '/new' || p === '/tasks' || p === '/history' || SESS.test(p);
+const isWide = (p) => p === '/' || p === '/new' || p === '/tasks' || p === '/history' || p === WEB || SESS.test(p);
 const RAIL_KEY = 'looklook.rail';
 
 function readFlag(key, fallback) {
@@ -307,7 +308,7 @@ function useTitleCount() {
 }
 
 // 会话栏只在会话相关的页面出现（docs/UI_REDESIGN_2026-10.md §2.1）；工具页内容区铺满
-const isSessionArea = (p) => p === '/' || p === '/project' || SESS.test(p);
+const isSessionArea = (p) => p === '/' || p === '/project' || p === WEB || SESS.test(p);
 const PANE_W_KEY = 'looklook.panew';
 const PANE_MIN = 240;
 const PANE_MAX = 440;
@@ -422,7 +423,7 @@ function SessionPane({ path, width, onWidth, onCollapse }) {
   };
   return (
     <aside className="spane" id="side-nav" aria-label={t('sess.title')}>
-      <SessionList currentId={current} onCollapse={onCollapse} />
+      <SessionList currentId={current} webActive={path === WEB} onCollapse={onCollapse} />
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- 分隔条可以用方向键调宽度 */}
       <div className="spane-resize" role="separator" aria-orientation="vertical" aria-valuenow={width} aria-valuemin={PANE_MIN} aria-valuemax={PANE_MAX} aria-label={t('sess.pane_resize')} tabIndex={0} onPointerDown={drag} onKeyDown={key} onDoubleClick={() => onWidth(288, true)} />
     </aside>
@@ -559,7 +560,7 @@ function ConsoleLayout({ path, stale, children }) {
           <ConnChip />
         </span>
       </header>
-      <div className={`console ${pane ? 'console-pane' : ''} ${sess ? 'console-sess' : ''}`} style={{ '--pane-w': `${width}px` }}>
+      <div className={`console ${pane ? 'console-pane' : ''} ${sess ? 'console-sess' : ''} ${path === WEB ? 'console-web' : ''}`} style={{ '--pane-w': `${width}px` }}>
         <NavRail path={path} paneOpen={paneOpen} onPane={setPane} />
         {pane && <SessionPane path={path} width={width} onWidth={onWidth} onCollapse={() => setPane(false)} />}
         <div className="console-col">

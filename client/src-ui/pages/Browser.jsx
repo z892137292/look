@@ -292,7 +292,7 @@ export default function Browser() {
 
   if (error && !tabs) {
     return (
-      <div className="stack">
+      <div className="stack browser-page">
         <h1>{t('browser.title')}</h1>
         <Note kind="error">{t('browser.down')}</Note>
       </div>

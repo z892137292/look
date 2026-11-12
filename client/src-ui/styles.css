@@ -3185,6 +3185,23 @@ button.chat-read-no:hover { color: var(--brand); opacity: 1; }
 .browser-view img { display: block; width: 100%; height: auto; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; outline: none; cursor: default; }
 .browser-view.vnc { display: block; }
 .browser-view.vnc iframe { display: block; width: 100%; aspect-ratio: 1280 / 800; max-height: calc(100dvh - 180px); border: 0; }
+/* 会话栏顶上的“本机网页”一行（和项目同一层，不缩进） */
+.sweb { margin-bottom: 6px; }
+.sweb .srow-main { padding-left: 8px; }
+.sweb:not(.current) .srow-icon { color: var(--brand); }
+/* 在会话区里打开：铺满右边；电脑上整页不滚动，画面占满剩下的高度 */
+.console-wide > .browser-page { padding: 12px 16px 16px; }
+@media (min-width: 900px) {
+  .console-web { height: 100vh; height: 100dvh; overflow: hidden; }
+  .console-web .console-col { display: flex; flex-direction: column; min-height: 0; }
+  .console-web .console-col > :not(.console-main), .console-web .console-main > :not(.browser-page) { flex: none; }
+  .console-web .console-main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .console-web .browser-page { flex: 1; min-height: 0; }
+  .console-web .browser-view { flex: 1; min-height: 0; }
+  .console-web .browser-view.vnc iframe { height: 100%; aspect-ratio: auto; max-height: none; }
+  .console-web .browser-view:not(.vnc) { position: relative; }
+  .console-web .browser-view img { position: absolute; inset: 0; margin: auto; width: auto; max-width: 100%; max-height: 100%; }
+}
 
 /* 本地改版：「节点」页（pages/Nodes.jsx） */
 .nodes-now { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; }
